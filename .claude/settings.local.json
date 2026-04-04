@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:services1.arcgis.com)",
+      "WebFetch(domain:data-athensclarke.opendata.arcgis.com)",
+      "WebFetch(domain:enigma.accgov.com)",
+      "Bash(/c/Miniconda3/envs/real_estate/python.exe -c ':*)"
+    ]
+  }
+}

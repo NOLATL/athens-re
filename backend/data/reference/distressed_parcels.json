@@ -1,0 +1,165 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-83.405866, 33.962588] },
+      "properties": {
+        "parcel_id": "C01A-005-001",
+        "address": "422 Oglethorpe Ave, Athens, GA 30606",
+        "county": "clarke",
+        "distress_score": 85,
+        "distress_tier": "critical",
+        "signals": ["Tax delinquent 3+ years", "Active fi fa lien", "Code violation — structural hazard", "Absentee owner"],
+        "tax_owed": 14200.00,
+        "assessed_value": 68000,
+        "owner_name": "Estate of Robert Hicks",
+        "owner_mailing_address": "PO Box 4412, Augusta, GA 30901",
+        "zoning_code": "RS-8",
+        "lot_size_acres": 0.22,
+        "year_built": 1948,
+        "proximity_score": 72
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-83.412034, 33.971731] },
+      "properties": {
+        "parcel_id": "C02B-011-004",
+        "address": "837 Prince Ave, Athens, GA 30606",
+        "county": "clarke",
+        "distress_score": 75,
+        "distress_tier": "critical",
+        "signals": ["Tax delinquent 2 years", "Active fi fa lien", "Absentee owner", "Structure pre-1960 no recent permits"],
+        "tax_owed": 8900.00,
+        "assessed_value": 95000,
+        "owner_name": "Danielle Forsyth",
+        "owner_mailing_address": "1104 Buford Hwy, Atlanta, GA 30329",
+        "zoning_code": "C-N",
+        "lot_size_acres": 0.31,
+        "year_built": 1956,
+        "proximity_score": 81
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-83.363581, 33.957910] },
+      "properties": {
+        "parcel_id": "C03C-018-002",
+        "address": "1205 Broad St, Athens, GA 30605",
+        "county": "clarke",
+        "distress_score": 70,
+        "distress_tier": "critical",
+        "signals": ["Tax sale list", "Code violation — roof failure", "Absentee owner"],
+        "tax_owed": 22100.00,
+        "assessed_value": 112000,
+        "owner_name": "Sunset Holdings LLC",
+        "owner_mailing_address": "3300 Peachtree Rd NE, Atlanta, GA 30326",
+        "zoning_code": "MX",
+        "lot_size_acres": 0.18,
+        "year_built": 1962,
+        "proximity_score": 68
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-83.385366, 33.965531] },
+      "properties": {
+        "parcel_id": "C04A-022-009",
+        "address": "310 Barber St, Athens, GA 30601",
+        "county": "clarke",
+        "distress_score": 60,
+        "distress_tier": "high",
+        "signals": ["Tax delinquent 1 year", "Multiple code violations", "Absentee owner"],
+        "tax_owed": 3800.00,
+        "assessed_value": 54000,
+        "owner_name": "Marcus L. Webb",
+        "owner_mailing_address": "88 Pecan Ct, Grovetown, GA 30813",
+        "zoning_code": "RS-8",
+        "lot_size_acres": 0.15,
+        "year_built": 1971,
+        "proximity_score": 55
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-83.390690, 33.965863] },
+      "properties": {
+        "parcel_id": "C05D-003-007",
+        "address": "514 Boulevard, Athens, GA 30601",
+        "county": "clarke",
+        "distress_score": 55,
+        "distress_tier": "high",
+        "signals": ["Active fi fa lien", "Assessed value declining YoY", "Absentee owner"],
+        "tax_owed": 0,
+        "assessed_value": 78000,
+        "owner_name": "Piedmont Asset Partners",
+        "owner_mailing_address": "225 Peachtree St, Suite 900, Atlanta, GA 30303",
+        "zoning_code": "RM-1",
+        "lot_size_acres": 0.27,
+        "year_built": 1969,
+        "proximity_score": 62
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-83.381908, 33.957582] },
+      "properties": {
+        "parcel_id": "C06B-014-003",
+        "address": "209 Reese St, Athens, GA 30601",
+        "county": "clarke",
+        "distress_score": 50,
+        "distress_tier": "high",
+        "signals": ["Tax delinquent 1 year", "Structure pre-1970 no recent permits", "Absentee owner"],
+        "tax_owed": 2100.00,
+        "assessed_value": 47000,
+        "owner_name": "Carolyn T. Mims",
+        "owner_mailing_address": "6612 Old Winder Hwy, Bethlehem, GA 30620",
+        "zoning_code": "RS-8",
+        "lot_size_acres": 0.12,
+        "year_built": 1952,
+        "proximity_score": 58
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-83.388565, 33.936069] },
+      "properties": {
+        "parcel_id": "C07C-031-001",
+        "address": "1740 S Lumpkin St, Athens, GA 30605",
+        "county": "clarke",
+        "distress_score": 40,
+        "distress_tier": "watch",
+        "signals": ["Assessed value declining YoY", "Structure pre-1970 no recent permits"],
+        "tax_owed": 0,
+        "assessed_value": 88000,
+        "owner_name": "James & Patricia Odom",
+        "owner_mailing_address": "1740 S Lumpkin St, Athens, GA 30605",
+        "zoning_code": "RS-15",
+        "lot_size_acres": 0.35,
+        "year_built": 1958,
+        "proximity_score": 44
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-83.488573, 33.940238] },
+      "properties": {
+        "parcel_id": "C08E-007-005",
+        "address": "4421 Atlanta Hwy, Athens, GA 30606",
+        "county": "clarke",
+        "distress_score": 35,
+        "distress_tier": "watch",
+        "signals": ["Multiple code violations", "Assessed value declining YoY"],
+        "tax_owed": 1200.00,
+        "assessed_value": 135000,
+        "owner_name": "GNV Properties LLC",
+        "owner_mailing_address": "PO Box 7821, Athens, GA 30604",
+        "zoning_code": "C-H",
+        "lot_size_acres": 0.48,
+        "year_built": 1975,
+        "proximity_score": 39
+      }
+    }
+  ]
+}

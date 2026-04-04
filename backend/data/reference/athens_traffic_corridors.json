@@ -1,0 +1,242 @@
+[
+  {
+    "id": "t001",
+    "road": "SR-316 / Epps Bridge Pkwy",
+    "segment": "at Oconee Connector / Epps Bridge Rd",
+    "aadt": 47200,
+    "road_type": "state_highway",
+    "lat": 33.9297,
+    "lng": -83.4444,
+    "note": "Primary commercial spine to Oconee County; massive retail concentration"
+  },
+  {
+    "id": "t002",
+    "road": "SR-316 / US-78",
+    "segment": "at Experiment Station Rd (Oconee Co.)",
+    "aadt": 52100,
+    "road_type": "state_highway",
+    "lat": 33.9120,
+    "lng": -83.4670,
+    "note": "Highest-traffic corridor in the region; Oconee commercial gateway"
+  },
+  {
+    "id": "t003",
+    "road": "SR-10 Loop (Atlanta Hwy)",
+    "segment": "at Atlanta Hwy / US-29 junction (west)",
+    "aadt": 32400,
+    "road_type": "state_highway",
+    "lat": 33.9720,
+    "lng": -83.4280,
+    "note": "Western Loop 10 — high-traffic arterial, commercial redevelopment zone"
+  },
+  {
+    "id": "t004",
+    "road": "SR-10 Loop (east)",
+    "segment": "at Lexington Rd / Timothy Rd",
+    "aadt": 26800,
+    "road_type": "state_highway",
+    "lat": 33.9540,
+    "lng": -83.3220,
+    "note": "East Athens Loop 10; growing corridor toward Madison"
+  },
+  {
+    "id": "t005",
+    "road": "SR-10 Loop (south)",
+    "segment": "at Milledge Ave / Whitehall Rd",
+    "aadt": 24100,
+    "road_type": "state_highway",
+    "lat": 33.9200,
+    "lng": -83.3790,
+    "note": "South Loop 10; near Beechwood Shopping Center"
+  },
+  {
+    "id": "t006",
+    "road": "US-441 / Atlanta Hwy",
+    "segment": "at Oconee St / Prince Ave interchange",
+    "aadt": 21500,
+    "road_type": "us_highway",
+    "lat": 33.9610,
+    "lng": -83.4040,
+    "note": "US-441 through downtown Athens; commercial + mixed-use corridor"
+  },
+  {
+    "id": "t007",
+    "road": "US-441 (south)",
+    "segment": "near ACC/Oconee county line",
+    "aadt": 19800,
+    "road_type": "us_highway",
+    "lat": 33.8980,
+    "lng": -83.4110,
+    "note": "Path-of-progress corridor; commercial development expanding from Oconee"
+  },
+  {
+    "id": "t008",
+    "road": "US-29N / Prince Ave",
+    "segment": "at Barber St / Hawthorne Ave",
+    "aadt": 16900,
+    "road_type": "us_highway",
+    "lat": 33.9790,
+    "lng": -83.3900,
+    "note": "Prince Ave commercial strip; boutique retail and restaurant row"
+  },
+  {
+    "id": "t009",
+    "road": "US-78 / Broad St",
+    "segment": "at downtown Athens core",
+    "aadt": 17300,
+    "road_type": "us_highway",
+    "lat": 33.9610,
+    "lng": -83.3930,
+    "note": "Downtown main street; entertainment district, UGA game-day traffic"
+  },
+  {
+    "id": "t010",
+    "road": "Timothy Rd / Jennings Mill Rd",
+    "segment": "at US-29 (Oconee Co.)",
+    "aadt": 14300,
+    "road_type": "county_arterial",
+    "lat": 33.9160,
+    "lng": -83.4600,
+    "note": "Oconee retail collector; near Lowe's, Target, Kroger anchors"
+  },
+  {
+    "id": "t011",
+    "road": "Baxter St",
+    "segment": "at Pulaski St / Talmadge Dr",
+    "aadt": 11600,
+    "road_type": "urban_arterial",
+    "lat": 33.9240,
+    "lng": -83.3740,
+    "note": "High-density student rental corridor; strong rental demand from UGA"
+  },
+  {
+    "id": "t012",
+    "road": "College Ave",
+    "segment": "at downtown / Five Points",
+    "aadt": 10800,
+    "road_type": "urban_arterial",
+    "lat": 33.9590,
+    "lng": -83.3780,
+    "note": "Downtown connector; Five Points neighborhood gateway"
+  },
+  {
+    "id": "t013",
+    "road": "Milledge Ave",
+    "segment": "at Milledge Cir / Cloverhurst Ave",
+    "aadt": 9200,
+    "road_type": "urban_arterial",
+    "lat": 33.9330,
+    "lng": -83.3750,
+    "note": "Historic Milledge Ave; high-demand residential, premium rental market"
+  },
+  {
+    "id": "t014",
+    "road": "Jefferson Rd",
+    "segment": "at Epps Bridge Rd",
+    "aadt": 8500,
+    "road_type": "county_arterial",
+    "lat": 33.9580,
+    "lng": -83.4300,
+    "note": "West Athens connector; near Kroger, ACC parks facilities"
+  },
+  {
+    "id": "t015",
+    "road": "Barnett Shoals Rd",
+    "segment": "at US-78 / Lexington Rd",
+    "aadt": 7100,
+    "road_type": "county_arterial",
+    "lat": 33.9090,
+    "lng": -83.3320,
+    "note": "East Athens / Oglethorpe Ave corridor; residential collector"
+  },
+  {
+    "id": "t016",
+    "road": "Alps Rd",
+    "segment": "at Prince Ave / Tallassee Rd",
+    "aadt": 6200,
+    "road_type": "urban_arterial",
+    "lat": 33.9790,
+    "lng": -83.4130,
+    "note": "Far west residential collector; near ACC compost facility"
+  },
+  {
+    "id": "t017",
+    "road": "Hawthorne Ave",
+    "segment": "at Gaines School Rd",
+    "aadt": 8900,
+    "road_type": "urban_arterial",
+    "lat": 33.9700,
+    "lng": -83.3620,
+    "note": "Northeast residential arterial; growing UGA graduate housing demand"
+  },
+  {
+    "id": "t018",
+    "road": "Tallassee Rd / Bob Holman Rd",
+    "segment": "at SR-10 Loop (west)",
+    "aadt": 5800,
+    "road_type": "county_arterial",
+    "lat": 33.9880,
+    "lng": -83.4450,
+    "note": "Western rural collector; low density, agricultural transition zone"
+  },
+  {
+    "id": "t019",
+    "road": "Cedar Shoals Dr / SR-10 Loop (east)",
+    "segment": "at Cedar Shoals High School / Gaines School Rd",
+    "aadt": 21300,
+    "road_type": "state_highway",
+    "lat": 33.9470,
+    "lng": -83.3380,
+    "note": "East Athens Loop 10 inner corridor; Cedar Shoals / Park East neighborhood"
+  },
+  {
+    "id": "t020",
+    "road": "Lexington Rd / US-78",
+    "segment": "at Cedar Shoals / Prince Ave E",
+    "aadt": 15700,
+    "road_type": "us_highway",
+    "lat": 33.9620,
+    "lng": -83.3450,
+    "note": "Northeast arterial toward Lexington; steady residential feeder"
+  },
+  {
+    "id": "t021",
+    "road": "Gaines School Rd",
+    "segment": "at Barnett Shoals Rd / Macon Hwy",
+    "aadt": 9800,
+    "road_type": "county_arterial",
+    "lat": 33.9350,
+    "lng": -83.3520,
+    "note": "East Athens residential collector; connects to SR-10 east"
+  },
+  {
+    "id": "t022",
+    "road": "Macon Hwy / US-78 E",
+    "segment": "at Oconee Connector / Barnett Shoals",
+    "aadt": 13400,
+    "road_type": "us_highway",
+    "lat": 33.9120,
+    "lng": -83.3600,
+    "note": "Southeast corridor; growing residential development toward Madison"
+  },
+  {
+    "id": "t023",
+    "road": "Oglethorpe Ave / US-29 S",
+    "segment": "at Finley St / Broad St E",
+    "aadt": 12600,
+    "road_type": "us_highway",
+    "lat": 33.9530,
+    "lng": -83.3680,
+    "note": "Southeast Athens connector; near UGA East Campus / Normaltown"
+  },
+  {
+    "id": "t024",
+    "road": "Normaltown / Prince Ave (east)",
+    "segment": "at Pulaski St / Reese St",
+    "aadt": 11200,
+    "road_type": "urban_arterial",
+    "lat": 33.9640,
+    "lng": -83.3720,
+    "note": "Normaltown neighborhood hub; high walkability, strong rental demand"
+  }
+]

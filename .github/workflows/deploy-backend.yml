@@ -1,0 +1,48 @@
+# Deploy Flask backend to Azure App Service (Python 3.11 on Linux)
+#
+# Required GitHub Secrets:
+#   AZURE_WEBAPP_NAME          — your App Service name (e.g. "athens-re-api")
+#   AZURE_WEBAPP_PUBLISH_PROFILE — contents of the .PublishSettings file from
+#                                  Azure Portal → App Service → Get publish profile
+#
+# One-time Azure setup:
+#   1. Create App Service: Python 3.11 | Linux | B1 tier (or F1 free)
+#   2. Set startup command in Configuration → General settings:
+#        gunicorn --bind=0.0.0.0:8000 --workers=2 --timeout=120 backend.api.app:app
+#   3. Set App Settings (Configuration → Application settings):
+#        DATABASE_URL      sqlite:///home/site/wwwroot/backend/db/real_estate.db
+#        CENSUS_API_KEY    <your key if you have one>
+#   4. Download publish profile and paste into GitHub secret
+
+name: Deploy Backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'requirements.txt'
+      - 'startup.txt'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies (validate requirements.txt)
+        run: pip install -r requirements.txt --quiet
+
+      - name: Deploy to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: .

@@ -1,0 +1,29 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+
+# Conda
+environment.yml.lock
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# SQLite
+*.db
+
+# Shapefiles (large — download per brief §4)
+backend/data/shapefiles/*/
+
+# Permit data (large — download via fetch_permit_data.py)
+backend/data/reference/acc_permits.json
+
+# OS
+.DS_Store
+Thumbs.db

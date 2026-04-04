@@ -1,0 +1,61 @@
+# Deploy React frontend to Azure Static Web Apps (free tier)
+#
+# Required GitHub Secrets:
+#   AZURE_STATIC_WEB_APPS_API_TOKEN — deployment token from Azure Portal →
+#                                     Static Web Apps → Manage deployment token
+#   VITE_API_URL                    — your App Service URL, e.g.:
+#                                     https://athens-re-api.azurewebsites.net
+#
+# One-time Azure setup:
+#   1. Create Static Web App resource in Azure Portal
+#   2. Link to your GitHub repo (or grab the deployment token for manual setup)
+#   3. Add VITE_API_URL as a GitHub Actions secret (NOT in the SWA env settings —
+#      Vite bakes it into the bundle at build time)
+
+name: Deploy Frontend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/src/**'
+      - 'frontend/public/**'
+      - 'frontend/index.html'
+      - 'frontend/package.json'
+      - 'frontend/vite.config.js'
+      - 'staticwebapp.config.json'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Build
+        run: npm run build
+        working-directory: frontend
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+
+      - name: Deploy to Azure Static Web Apps
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          app_location: frontend
+          output_location: dist
+          skip_app_build: true
