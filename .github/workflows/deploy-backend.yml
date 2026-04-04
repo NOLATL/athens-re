@@ -21,6 +21,7 @@ on:
     branches: [main]
     paths:
       - 'backend/**'
+      - 'App_Data/**'
       - 'requirements.txt'
       - 'startup.txt'
   workflow_dispatch:
