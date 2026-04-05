@@ -78,7 +78,9 @@ NOTIFY_EMAIL      = os.getenv("NOTIFY_EMAIL", "")         # recipient
 FROM_EMAIL        = os.getenv("FROM_EMAIL", "noreply@athens-re.app")
 
 # ── Shapefile paths ───────────────────────────────────────────────────────────
-DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+# On Azure App Service set GIS_DATA_DIR=/home/site/data (persistent, survives deploys).
+# Locally defaults to backend/data/ relative to this file.
+DATA_DIR = os.getenv("GIS_DATA_DIR", os.path.join(os.path.dirname(__file__), "data"))
 SHAPEFILES = {
     "acc_zoning": os.path.join(DATA_DIR, "shapefiles", "acc_zoning"),
     "acc_parcels": os.path.join(DATA_DIR, "shapefiles", "acc_parcels"),

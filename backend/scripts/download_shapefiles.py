@@ -39,7 +39,10 @@ LAYERS = {
     },
 }
 
-DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "shapefiles")
+DATA_DIR = os.path.join(
+    os.getenv("GIS_DATA_DIR", os.path.join(os.path.dirname(__file__), "..", "data")),
+    "shapefiles",
+)
 PAGE_SIZE = 2000
 RETRY_DELAY = 3
 

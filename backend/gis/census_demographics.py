@@ -31,7 +31,10 @@ VARIABLES = {
     "B25035_001E": "median_year_structure_built",
 }
 
-_DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "shapefiles", "census_tracts")
+_DATA_DIR = os.path.join(
+    os.getenv("GIS_DATA_DIR", os.path.join(os.path.dirname(__file__), "..", "data")),
+    "shapefiles", "census_tracts",
+)
 
 
 def _build_params(for_clause: str, in_clause: str) -> dict:

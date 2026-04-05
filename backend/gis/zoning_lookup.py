@@ -24,7 +24,10 @@ logger = logging.getLogger(__name__)
 # ── module-level cache ────────────────────────────────────────────────────────
 _zoning_gdf: gpd.GeoDataFrame | None = None
 _parcels_gdf: gpd.GeoDataFrame | None = None
-_DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "shapefiles")
+_DATA_DIR = os.path.join(
+    os.getenv("GIS_DATA_DIR", os.path.join(os.path.dirname(__file__), "..", "data")),
+    "shapefiles",
+)
 
 
 def _load_zoning() -> gpd.GeoDataFrame | None:

@@ -52,7 +52,10 @@ ACS_VARIABLES = {
     "B25035_001E": "median_year_structure_built",
 }
 
-OUT_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "shapefiles", "census_tracts")
+OUT_DIR = os.path.join(
+    os.getenv("GIS_DATA_DIR", os.path.join(os.path.dirname(__file__), "..", "data")),
+    "shapefiles", "census_tracts",
+)
 OUT_FILE = os.path.join(OUT_DIR, "clarke_tracts.geojson")
 
 
