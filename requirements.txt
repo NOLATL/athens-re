@@ -8,3 +8,5 @@ fiona>=1.9
 pyproj>=3.6
 requests>=2.31
 gunicorn>=22.0
+beautifulsoup4>=4.12
+lxml>=5.0
