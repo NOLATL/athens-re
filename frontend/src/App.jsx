@@ -402,9 +402,12 @@ function PropertyMap() {
     if (!showZoning || zoningData !== null) return;
     setZoningLoading(true);
     fetch(`${API_URL}/api/zoning-geojson`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) return null;
+        return r.json();
+      })
       .then((data) => {
-        setZoningData(data);
+        setZoningData(data && data.type === "FeatureCollection" ? data : null);
         setZoningLoading(false);
       })
       .catch(() => {
@@ -418,9 +421,12 @@ function PropertyMap() {
     if (!showCensus || censusData !== null) return;
     setCensusLoading(true);
     fetch(`${API_URL}/api/census-tracts`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) return null;
+        return r.json();
+      })
       .then((data) => {
-        setCensusData(data);
+        setCensusData(data && data.type === "FeatureCollection" ? data : null);
         setCensusLoading(false);
       })
       .catch(() => {
