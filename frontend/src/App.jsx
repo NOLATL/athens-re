@@ -355,12 +355,17 @@ function MapFlyTo({ selected, properties }) {
 
 // ── Tab: Property Map ────────────────────────────────────────────────────────
 
-function PropertyMap() {
+function PropertyMap({ onLoadCalculator }) {
   const [properties, setProperties] = useState(PROPERTIES);
   const [listingsLoading, setListingsLoading] = useState(true);
   const [selected, setSelected] = useState(null);
   const [filter, setFilter] = useState("sfh");
   const [showDistressed, setShowDistressed] = useState(false);
+  const [dismissed, setDismissed] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("re_dismissed") || "[]")); }
+    catch { return new Set(); }
+  });
+  const [showDismissed, setShowDismissed] = useState(false);
   const [distressedParcels, setDistressedParcels] = useState([]);
   const [selectedDistressed, setSelectedDistressed] = useState(null);
   const [showZoning, setShowZoning] = useState(false);
@@ -382,6 +387,20 @@ function PropertyMap() {
   const fetchedComps = useRef(new Set());
   const fetchedScore = useRef(new Set());
   const fetchedTraffic = useRef(new Set());
+
+  const dismissProperty = (id) => {
+    const next = new Set(dismissed);
+    next.add(String(id));
+    setDismissed(next);
+    localStorage.setItem("re_dismissed", JSON.stringify([...next]));
+    if (selected === id) setSelected(null);
+  };
+  const undismissProperty = (id) => {
+    const next = new Set(dismissed);
+    next.delete(String(id));
+    setDismissed(next);
+    localStorage.setItem("re_dismissed", JSON.stringify([...next]));
+  };
 
   // Fetch distressed parcels from API when layer is toggled on
   useEffect(() => {
@@ -530,6 +549,17 @@ function PropertyMap() {
       .catch(() => fetchedTraffic.current.delete(selected));
   }, [selected, properties]);
 
+  // Deep-link: ?property=<address> auto-selects and scrolls to a property.
+  // Fires when properties updates so it works for both seed data and API-loaded data.
+  useEffect(() => {
+    const addr = new URLSearchParams(window.location.search).get("property");
+    if (!addr || properties.length === 0) return;
+    const match = properties.find((p) => (p.address || "").toLowerCase() === addr.toLowerCase());
+    if (!match) return;
+    setSelected(match.id);
+    setTimeout(() => cardRefs.current[match.id]?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
+  }, [properties]);
+
   // Pre-fetch scores for all properties in one batch request
   useEffect(() => {
     if (!properties.length) return;
@@ -574,7 +604,9 @@ function PropertyMap() {
       });
   }, [properties]);
 
-  const filtered = properties.filter((p) => matchesPropType(p, filter))
+  const filtered = properties
+    .filter((p) => matchesPropType(p, filter))
+    .filter((p) => showDismissed || !dismissed.has(String(p.id)))
     .slice()
     .sort((a, b) => {
       const sa = scoreCache[a.id]?.data?.composite_score ?? -1;
@@ -598,6 +630,12 @@ function PropertyMap() {
           {PROP_TYPE_OPTIONS.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
         </select>
         <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", marginLeft: "auto" }}>
+          {dismissed.size > 0 && (
+            <button onClick={() => setShowDismissed((v) => !v)}
+              style={{ padding: "6px 10px", borderRadius: "6px", border: `1px solid ${showDismissed ? COLORS.orange : COLORS.border}`, background: showDismissed ? COLORS.orange + "18" : "transparent", color: showDismissed ? COLORS.orange : COLORS.textDim, fontSize: "12px", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+              Passed ({dismissed.size}) {showDismissed ? "▲" : "▼"}
+            </button>
+          )}
           <button onClick={() => setShowZoning((v) => !v)}
             style={{ padding: "6px 10px", borderRadius: "6px", border: `1px solid ${showZoning ? COLORS.blue : COLORS.border}`, background: showZoning ? COLORS.blue + "20" : "transparent", color: showZoning ? COLORS.blue : COLORS.textDim, fontSize: "12px", fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
             🗺 Zoning {zoningLoading ? "…" : showZoning ? "ON" : "OFF"}
@@ -789,7 +827,20 @@ function PropertyMap() {
                 style={{ background: isOpen ? COLORS.cardHover : COLORS.card, border: `1px solid ${isOpen ? dotColor + "60" : COLORS.border}`, borderRadius: "8px", padding: "14px", cursor: "pointer", transition: "all 0.15s" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
                   <div style={{ width: "22px", height: "22px", borderRadius: "50%", background: dotColor, flexShrink: 0, boxShadow: `0 0 6px ${dotColor}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 800, color: "#fff" }}>{rank}</div>
-                  <span style={{ fontWeight: 700, fontSize: "13px", color: COLORS.text }}>{p.address}</span>
+                  <span style={{ fontWeight: 700, fontSize: "13px", color: COLORS.text, flex: 1 }}>{p.address}</span>
+                  {dismissed.has(String(p.id)) ? (
+                    <button onClick={(e) => { e.stopPropagation(); undismissProperty(p.id); }}
+                      title="Restore"
+                      style={{ marginLeft: "auto", padding: "2px 8px", fontSize: "10px", fontWeight: 700, color: COLORS.orange, background: COLORS.orange + "15", border: `1px solid ${COLORS.orange}40`, borderRadius: "4px", cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>
+                      Undo
+                    </button>
+                  ) : (
+                    <button onClick={(e) => { e.stopPropagation(); dismissProperty(p.id); }}
+                      title="Mark as reviewed / pass"
+                      style={{ marginLeft: "auto", padding: "2px 8px", fontSize: "10px", fontWeight: 700, color: COLORS.textDim, background: "transparent", border: `1px solid ${COLORS.border}`, borderRadius: "4px", cursor: "pointer", fontFamily: "inherit", flexShrink: 0, opacity: 0.6 }}>
+                      Pass
+                    </button>
+                  )}
                 </div>
                 <div style={{ display: "flex", gap: "12px", marginLeft: "30px", alignItems: "center" }}>
                   <span style={{ fontSize: "16px", fontWeight: 800, color: COLORS.accent }}>{p.price}</span>
@@ -990,6 +1041,40 @@ function PropertyMap() {
                         </div>
                       );
                     })()}
+                    {/* Price history — shows age of listing and any price drop */}
+                    {(() => {
+                      const prevPrice = p.previous_price;
+                      const curPrice = parseFloat((p.price || "").replace(/[$,~]/g, "").match(/[\d.]+/)?.[0] || "");
+                      const firstSeen = p.first_seen;
+                      const daysOld = firstSeen
+                        ? Math.round((Date.now() - new Date(firstSeen).getTime()) / 86400000)
+                        : null;
+                      const dropped = prevPrice && curPrice && prevPrice > curPrice;
+                      if (!dropped && daysOld == null) return null;
+                      return (
+                        <div style={{ marginBottom: "10px", padding: "7px 10px", background: dropped ? COLORS.green + "08" : COLORS.bg, borderRadius: "6px", border: `1px solid ${dropped ? COLORS.green + "30" : COLORS.border}`, display: "flex", gap: "14px", flexWrap: "wrap", fontSize: "11px" }}>
+                          {daysOld != null && (
+                            <span>
+                              <span style={{ color: COLORS.textDim }}>On market: </span>
+                              <span style={{ fontWeight: 700, color: daysOld <= 7 ? COLORS.blue : daysOld <= 30 ? COLORS.text : COLORS.orange }}>
+                                {daysOld === 0 ? "Just listed" : `${daysOld} day${daysOld !== 1 ? "s" : ""}`}
+                              </span>
+                            </span>
+                          )}
+                          {dropped && (
+                            <span>
+                              <span style={{ color: COLORS.textDim }}>Price drop: </span>
+                              <span style={{ fontWeight: 700, color: COLORS.green }}>
+                                ↓ from ${prevPrice.toLocaleString()}
+                                <span style={{ fontWeight: 400, color: COLORS.textDim }}>
+                                  {" "}(–${(prevPrice - curPrice).toLocaleString()})
+                                </span>
+                              </span>
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
                     <p style={{ margin: "0 0 12px", fontSize: "12px", color: COLORS.textDim, lineHeight: 1.6 }}>{p.why}</p>
                     <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                       <a href={`https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
@@ -998,6 +1083,17 @@ function PropertyMap() {
                         style={{ padding: "6px 14px", color: COLORS.accent, border: `1px solid ${COLORS.accent}40`, borderRadius: "5px", fontSize: "12px", fontWeight: 700, textDecoration: "none" }}>Redfin ↗</a>
                       <a href={`https://www.zillow.com/homes/${encodeURIComponent(p.address.split(",")[0])}_rb/`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
                         style={{ padding: "6px 14px", color: COLORS.accent, border: `1px solid ${COLORS.accent}40`, borderRadius: "5px", fontSize: "12px", fontWeight: 700, textDecoration: "none" }}>Zillow ↗</a>
+                      {onLoadCalculator && (
+                        <button onClick={(e) => {
+                          e.stopPropagation();
+                          const priceVal = parseFloat((p.price || "").replace(/[$,~]/g, "").match(/[\d.]+/)?.[0] || "");
+                          const rentMid = cashFlowCache[p.id]?.data?.rent_estimate?.mid;
+                          onLoadCalculator({ price: priceVal || 275000, rent: rentMid || 1800, county: p.county || "clarke" });
+                        }}
+                          style={{ padding: "6px 14px", color: COLORS.green, background: "transparent", border: `1px solid ${COLORS.green}40`, borderRadius: "5px", fontSize: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                          Open in Calculator →
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1111,11 +1207,18 @@ function MarketOverview() {
 
 // ── Tab: Cash Flow Calculator ────────────────────────────────────────────────
 
-function CashFlowCalc() {
+function CashFlowCalc({ seed }) {
   const [price, setPrice] = useState(275000);
   const [down, setDown] = useState(25);
   const [rate, setRate] = useState(6.5);
   const [rent, setRent] = useState(1800);
+  const lastSeedRef = useRef(null);
+  useEffect(() => {
+    if (!seed || seed === lastSeedRef.current) return;
+    lastSeedRef.current = seed;
+    if (seed.price) setPrice(seed.price);
+    if (seed.rent) setRent(seed.rent);
+  }, [seed]);
   const [tax, setTax] = useState(0);
   const [insurance, setInsurance] = useState(120);
   const [maintenance, setMaintenance] = useState(5);
@@ -1463,6 +1566,20 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("map");
   const [showDocs, setShowDocs] = useState(false);
   const [showFAQ, setShowFAQ] = useState(false);
+  const [dataAsOf, setDataAsOf] = useState("Mar 2026");
+  const [calcSeed, setCalcSeed] = useState(null);
+
+  const handleLoadCalculator = (seed) => {
+    setCalcSeed(seed);
+    setActiveTab("cashflow");
+  };
+
+  useEffect(() => {
+    fetch(`${API_URL}/api/data-freshness`)
+      .then((r) => r.json())
+      .then((d) => { if (d.data_as_of) setDataAsOf(d.data_as_of); })
+      .catch(() => {});
+  }, []);
 
   return (
     <div style={{ background: COLORS.bg, minHeight: "100vh", color: COLORS.text, fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif" }}>
@@ -1472,7 +1589,7 @@ export default function App() {
         <div style={{ marginBottom: "20px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px", flexWrap: "wrap" }}>
             <h1 style={{ margin: 0, fontSize: "clamp(16px, 2vw, 24px)", fontWeight: 800, color: COLORS.text, letterSpacing: "-0.5px", whiteSpace: "nowrap" }}>Athens Real Estate Intelligence</h1>
-            <Badge>LIVE DATA — MAR 2026</Badge>
+            <Badge>LIVE DATA — {dataAsOf}</Badge>
             <div style={{ marginLeft: "auto", display: "flex", gap: "8px", flexShrink: 0 }}>
               <button onClick={() => setShowDocs(true)} style={{ padding: "6px 14px", borderRadius: "6px", border: `1px solid ${COLORS.accent}`, background: "transparent", color: COLORS.accent, fontSize: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>Documentation</button>
               <button onClick={() => setShowFAQ(true)} style={{ padding: "6px 14px", borderRadius: "6px", border: `1px solid ${COLORS.accent}`, background: "transparent", color: COLORS.accent, fontSize: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>FAQ</button>
@@ -1490,9 +1607,9 @@ export default function App() {
           ))}
         </div>
 
-        {activeTab === "map" && <PropertyMap />}
+        {activeTab === "map" && <PropertyMap onLoadCalculator={handleLoadCalculator} />}
         {activeTab === "overview" && <MarketOverview />}
-        {activeTab === "cashflow" && <CashFlowCalc />}
+        {activeTab === "cashflow" && <CashFlowCalc seed={calcSeed} />}
         {activeTab === "development" && <DevelopmentIntel />}
         {activeTab === "strategy" && <Strategy />}
 

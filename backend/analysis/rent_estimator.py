@@ -15,6 +15,7 @@ Usage:
 """
 import math
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,40 @@ ATHENS_BASE_RENTS_PER_UNIT = {
 
 # Athens market 2BR median (baseline denominator for census tract ratio)
 _ATHENS_2BR_MEDIAN = 1400
+
+# Path to the nightly-batch-updated rent baseline file (may not exist yet)
+_BASELINES_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "reference", "rent_baselines.json")
+
+# Module-level cache: (mtime_or_0, dict)
+_dynamic_baselines_cache: tuple = (0, ATHENS_BASE_RENTS)
+
+
+def _load_dynamic_baselines() -> dict:
+    """
+    Return ATHENS_BASE_RENTS updated with values from rent_baselines.json if
+    that file exists and was written by the nightly batch.  Falls back to the
+    hardcoded dict when the file is missing or unreadable.
+
+    The result is cached by file mtime so the disk is only read when the
+    nightly batch has written a fresh copy.
+    """
+    global _dynamic_baselines_cache
+    try:
+        if os.path.exists(_BASELINES_PATH):
+            mtime = os.path.getmtime(_BASELINES_PATH)
+            cached_mtime, cached_data = _dynamic_baselines_cache
+            if mtime == cached_mtime:
+                return cached_data
+            import json as _json
+            with open(_BASELINES_PATH) as f:
+                raw = _json.load(f)
+            merged = {**ATHENS_BASE_RENTS, **{int(k): int(v) for k, v in raw.items()}}
+            _dynamic_baselines_cache = (mtime, merged)
+            logger.debug("Loaded dynamic rent baselines from file: %s", merged)
+            return merged
+    except Exception as e:
+        logger.debug("Could not load dynamic rent baselines: %s", e)
+    return ATHENS_BASE_RENTS
 
 # UGA campus coordinates
 _UGA = (33.9480, -83.3774)
@@ -173,12 +208,13 @@ def estimate_rent(
     per_unit = _is_multifamily(property_type)
 
     # Step 1 — Athens market average for this bedroom count
+    _baselines = _load_dynamic_baselines()
     if per_unit:
         unit_count = _estimate_unit_count(property_type, beds)
         beds_per_unit = max(1, round(beds / unit_count))
         market_base = ATHENS_BASE_RENTS_PER_UNIT.get(min(beds_per_unit, 4), 1000)
     else:
-        market_base = ATHENS_BASE_RENTS.get(min(beds, 5), 1400)
+        market_base = _baselines.get(min(beds, 5), 1400)
 
     # Step 2 — Neighborhood adjustment via census tract median rent
     tract_rent = _get_tract_median_rent(lat, lng)
@@ -238,9 +274,7 @@ def aggregate_rent_estimates(
         }
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
-    from backend.scrapers.rent_sources import (
-        scrape_craigslist, scrape_zumper, scrape_rentcafe,
-    )
+    from backend.scrapers.rent_sources import scrape_redfin_rentals, scrape_hud_fmr
 
     # Internal calc is always available
     internal = estimate_rent(lat, lng, beds, sqft, property_type, county)
@@ -254,14 +288,13 @@ def aggregate_rent_estimates(
 
     beds_int = max(0, int(beds or 0))
     scraper_tasks = [
-        lambda b=beds_int: scrape_craigslist(b),
-        lambda b=beds_int: scrape_zumper(b),
-        lambda b=beds_int: scrape_rentcafe(b),
+        lambda b=beds_int: scrape_redfin_rentals(b),
+        lambda b=beds_int: scrape_hud_fmr(b),
     ]
 
     external: list[dict] = []
     try:
-        with ThreadPoolExecutor(max_workers=3) as pool:
+        with ThreadPoolExecutor(max_workers=2) as pool:
             futures = [pool.submit(fn) for fn in scraper_tasks]
             for f in as_completed(futures, timeout=10):
                 try:

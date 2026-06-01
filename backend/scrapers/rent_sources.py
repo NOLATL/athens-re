@@ -1,22 +1,26 @@
 """
 External rent scrapers — Athens, GA.
 
-Three city-level sources:
-  • Craigslist Athens  — median of recent /apa listings by bedroom count
-  • Zumper             — market median from rent-research page
-  • RentCafe           — average rent from market-trends page
+Two sources:
+  • Redfin Rentals  — median of active rental listings in Athens-Clarke County
+  • HUD FMR         — HUD Fair Market Rents for Athens metro (free API token required)
 
-All scrapers fail gracefully (return None) on network / parse errors.
-Results are cached in-memory for CACHE_TTL seconds so repeated score
-calls for the same bedroom count don't hammer external sites.
+Both fail gracefully (return None) on network / parse errors.
+Results are cached in-memory so repeated score calls don't hammer external sites:
+  Redfin Rentals — 1 hour TTL
+  HUD FMR raw    — 24 hour TTL (FMRs update once per fiscal year)
 """
-import re, time, logging
-import urllib.request, urllib.parse, urllib.error
+import json as _json
+import re
+import time
+import logging
+import urllib.request
 
 logger = logging.getLogger(__name__)
 
-_TIMEOUT   = 8      # seconds per HTTP request
-_CACHE_TTL = 3600   # re-scrape at most once per hour per (source, beds)
+_TIMEOUT      = 8      # seconds per HTTP request
+_CACHE_TTL    = 3600   # re-scrape at most once per hour per (source, beds)
+_HUD_CACHE_TTL = 86400  # HUD FMRs change once per fiscal year; cache for 24 h
 
 _HEADERS = {
     "User-Agent": (
@@ -47,227 +51,201 @@ def _cached(key: str, fn):
     return result
 
 
-def _get(url: str) -> str | None:
+def _hud_cached(key: str, fn):
+    """Like _cached but uses the longer HUD TTL."""
+    entry = _cache.get(key)
+    if entry and (time.time() - entry[0]) < _HUD_CACHE_TTL:
+        return entry[1]
+    result = fn()
+    _cache[key] = (time.time(), result)
+    return result
+
+
+# ── Redfin Rentals ─────────────────────────────────────────────────────────────
+#
+# Scrapes Redfin's county rental search page (Athens-Clarke) filtered by bedroom
+# count. Extracts "$X,XXX/mo" price patterns from the served HTML.
+#
+# This is a real-listing source — unlike the three city-aggregate sources above,
+# it reflects actual active rentals competing in the Athens market right now.
+# Falls back to None if Redfin blocks the request or changes their markup.
+
+_REDFIN_RENTALS_BASE = (
+    "https://www.redfin.com/county/36057/GA/Athens-Clarke/apartments-for-rent"
+)
+
+# Wider browser-like headers to reduce bot-detection risk
+_REDFIN_HEADERS = {
+    **_HEADERS,
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Cache-Control": "no-cache",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+}
+
+
+def scrape_redfin_rentals(beds: int) -> dict | None:
+    beds = max(0, min(int(beds), 5))
+    return _cached(f"redfin_rentals:{beds}", lambda: _do_redfin_rentals(beds))
+
+
+def _do_redfin_rentals(beds: int) -> dict | None:
+    url = f"{_REDFIN_RENTALS_BASE}/filter/min-beds={beds},max-beds={beds}"
     try:
-        req = urllib.request.Request(url, headers=_HEADERS)
+        req = urllib.request.Request(url, headers=_REDFIN_HEADERS)
         with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
-            return resp.read().decode("utf-8", errors="ignore")
+            raw = resp.read()
+        # Redfin may send gzip even without explicit Accept-Encoding negotiation
+        try:
+            import gzip as _gzip
+            html = _gzip.decompress(raw).decode("utf-8", errors="ignore")
+        except Exception:
+            html = raw.decode("utf-8", errors="ignore")
     except Exception as e:
-        logger.debug("HTTP GET %s failed: %s", url, e)
-        return None
-
-
-# ── Craigslist Athens ─────────────────────────────────────────────────────────
-
-def scrape_craigslist(beds: int) -> dict | None:
-    """
-    Search Athens Craigslist /apa for the given bedroom count.
-    Returns median asking rent from recent listings.
-    """
-    beds = max(0, int(beds))
-    return _cached(f"craigslist:{beds}", lambda: _do_craigslist(beds))
-
-
-def _do_craigslist(beds: int) -> dict | None:
-    url = (
-        f"https://athens.craigslist.org/search/apa"
-        f"?min_bedrooms={beds}&max_bedrooms={beds}&sort=date"
-    )
-    html = _get(url)
-    if not html:
+        logger.debug("Redfin rentals request failed (beds=%d): %s", beds, e)
         return None
 
     prices = []
-    # Pattern 1: <span class="priceinfo">$1,450</span>
-    for m in re.finditer(r'class="priceinfo[^"]*"[^>]*>[\s]*\$\s*([\d,]+)', html):
-        v = int(m.group(1).replace(",", ""))
-        if 300 <= v <= 8000:
-            prices.append(v)
-    # Pattern 2: data-price="XXXX"
-    if not prices:
-        for m in re.finditer(r'data-price="(\d+)"', html):
-            v = int(m.group(1))
+
+    # Primary: "$X,XXX/mo" text in HTML (strong rental signal)
+    for m in re.finditer(r'\$\s*([\d,]+)\s*/\s*mo\b', html, re.IGNORECASE):
+        try:
+            v = int(m.group(1).replace(",", ""))
             if 300 <= v <= 8000:
                 prices.append(v)
-    # Pattern 3: >$X,XXX< anywhere (broader fallback)
-    if not prices:
-        for m in re.finditer(r'>\s*\$([\d,]{3,6})\s*<', html):
-            v = int(m.group(1).replace(",", ""))
+        except (ValueError, TypeError):
+            pass
+
+    # Secondary: JSON "price" fields in the range of monthly rents (not sale prices)
+    if len(prices) < 3:
+        for m in re.finditer(r'"price"\s*:\s*(\d{3,4})', html):
+            v = int(m.group(1))
             if 300 <= v <= 8000:
                 prices.append(v)
 
     if len(prices) < 3:
+        logger.debug(
+            "Redfin rentals: too few prices found for %dBR (got %d) — skipping",
+            beds, len(prices),
+        )
         return None
 
     prices.sort()
-    n   = len(prices)
-    mid  = prices[n // 2]
-    low  = prices[n // 4]
-    high = prices[3 * n // 4]
-
-    return {
-        "source":      "Craigslist",
-        "mid":         mid,
-        "low":         low,
-        "high":        high,
+    n = len(prices)
+    result = {
+        "source":      "Redfin Rentals",
+        "mid":         prices[n // 2],
+        "low":         prices[n // 4],
+        "high":        prices[3 * n // 4],
         "sample_size": n,
     }
+    logger.debug("Redfin rentals %dBR: %d listings, mid=$%d", beds, n, result["mid"])
+    return result
 
 
-# ── Zumper ────────────────────────────────────────────────────────────────────
+# ── HUD Fair Market Rents ─────────────────────────────────────────────────────
+#
+# HUD publishes Fair Market Rents (FMRs) annually for each metro area.
+# For Athens-Clarke County MSA these are the government-defined affordability
+# benchmarks by bedroom count — a useful sanity-check floor for any estimate.
+#
+# Requires a free API token from https://www.huduser.gov/hudapi/public/register
+# Set HUD_API_TOKEN in your .env file.
+#
+# FMRs update once per fiscal year (October). The raw Athens record is cached
+# for 24 hours so repeated per-property calls don't re-hit the API.
 
-_ZUMPER_SLUG = {
-    0: "studios",
-    1: "one-bedrooms",
-    2: "two-bedrooms",
-    3: "three-bedrooms",
-    4: "four-bedrooms",
+_HUD_FMR_URL = "https://www.huduser.gov/hudapi/public/fmr/statedata/GA"
+
+# HUD API field names for each bedroom count
+_BED_TO_HUD_KEYS: dict[int, list[str]] = {
+    0: ["Efficiency", "0br", "0BR", "eff"],
+    1: ["One-Bedroom",  "1br", "1BR"],
+    2: ["Two-Bedroom",  "2br", "2BR"],
+    3: ["Three-Bedroom","3br", "3BR"],
+    4: ["Four-Bedroom", "4br", "4BR"],
 }
 
 
-def scrape_zumper(beds: int) -> dict | None:
+def scrape_hud_fmr(beds: int) -> dict | None:
     beds = max(0, min(int(beds), 4))
-    return _cached(f"zumper:{beds}", lambda: _do_zumper(beds))
+    return _cached(f"hud_fmr:{beds}", lambda: _do_hud_fmr(beds))
 
 
-# Reasonable rent ranges by bedroom count for sanity-checking Zumper output
-_ZUMPER_RENT_BOUNDS = {
-    0: (600,  2200),
-    1: (700,  2800),
-    2: (900,  3500),
-    3: (1100, 5000),
-    4: (1300, 7000),
-}
-
-
-def _zumper_plausible(mid: int, beds: int) -> bool:
-    lo, hi = _ZUMPER_RENT_BOUNDS.get(beds, (400, 8000))
-    return lo <= mid <= hi
-
-
-_ZUMPER_BED_KEY = {
-    0: "STUDIO",
-    1: "1_BED",
-    2: "2_BED",
-    3: "3_BED",
-    4: "4_BED",
-}
-
-
-def _do_zumper(beds: int) -> dict | None:
-    import json as _json
-
-    slug    = _ZUMPER_SLUG.get(beds, "two-bedrooms")
-    bed_key = _ZUMPER_BED_KEY.get(beds, "2_BED")
-    url     = f"https://www.zumper.com/rent-research/athens-ga/{slug}"
-    html    = _get(url)
-    if not html:
+def _do_hud_fmr(beds: int) -> dict | None:
+    from backend.config import HUD_API_TOKEN
+    if not HUD_API_TOKEN:
+        logger.debug("HUD_API_TOKEN not set — skipping HUD FMR source")
         return None
 
-    # Zumper embeds all data in window.__PRELOADED_STATE__
-    # Structure: rentResearchHomepage.rentalData.cities[0]
-    #            .bed_property_type.{N_BED}.AFR.median_rent
-    m_state = re.search(
-        r'window\.__PRELOADED_STATE__\s*=\s*(\{.*?\});\s*(?:window|</script>)',
-        html, re.DOTALL,
+    # The raw Athens record is the expensive part; cache it for 24 h
+    athens = _hud_cached(
+        "hud_fmr_athens_GA",
+        lambda: _fetch_hud_athens_record(HUD_API_TOKEN),
     )
-    if not m_state:
-        # Broader fallback: grab everything after the assignment
-        m_state = re.search(
-            r'window\.__PRELOADED_STATE__\s*=\s*(\{.+)',
-            html, re.DOTALL,
-        )
+    if not athens:
+        return None
 
-    if m_state:
-        raw = m_state.group(1).rstrip("; \n\r")
-        # The blob may be truncated; try progressively shorter slices
-        for end in (len(raw), 500_000, 200_000, 100_000):
-            try:
-                state = _json.loads(raw[:end])
-                cities = (
-                    state
-                    .get("rentResearchHomepage", {})
-                    .get("rentalData", {})
-                    .get("cities", [])
-                )
-                # Find Athens (or just use the first city on an Athens-scoped page)
-                city = next(
-                    (c for c in cities if "athens" in str(c.get("city", "")).lower()),
-                    cities[0] if cities else None,
-                )
-                if city:
-                    val = (
-                        city
-                        .get("bed_property_type", {})
-                        .get(bed_key, {})
-                        .get("AFR", {})
-                        .get("median_rent")
-                    )
-                    if isinstance(val, (int, float)):
-                        mid = round(val)
-                        if _zumper_plausible(mid, beds):
-                            return {
-                                "source":      "Zumper",
-                                "mid":         mid,
-                                "low":         round(mid * 0.88),
-                                "high":        round(mid * 1.12),
-                                "sample_size": None,
-                            }
-                break  # parsed OK but path not found — no point retrying
-            except (_json.JSONDecodeError, Exception) as e:
-                logger.debug("Zumper __PRELOADED_STATE__ parse (len=%d): %s", end, e)
-                continue
+    mid = _extract_hud_fmr_value(athens, beds)
+    if mid is None:
+        return None
 
+    result = {
+        "source": "HUD FMR",
+        "mid":    mid,
+        "low":    round(mid * 0.88),
+        "high":   round(mid * 1.12),
+        "method": "hud_fmr",
+    }
+    logger.debug("HUD FMR %dBR: $%d", beds, mid)
+    return result
+
+
+def _fetch_hud_athens_record(token: str) -> dict | None:
+    """
+    Call HUD's statedata endpoint for Georgia, locate the Athens-Clarke
+    metro entry, and return the raw FMR dict (keyed by bedroom label).
+    """
+    req = urllib.request.Request(
+        _HUD_FMR_URL,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+            "User-Agent": _HEADERS["User-Agent"],
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = _json.loads(resp.read().decode())
+    except Exception as e:
+        logger.warning("HUD FMR API request failed: %s", e)
+        return None
+
+    # Search metro areas first — Athens is an MSA
+    for area in data.get("data", {}).get("metroareas", []):
+        name = (area.get("areaname") or "") + (area.get("metroname") or "")
+        if "athens" in name.lower():
+            logger.debug("HUD FMR: found Athens metro record (%s)", area.get("areaname"))
+            return area
+
+    # Fallback: check county-level entries for Clarke County
+    for county in data.get("data", {}).get("counties", []):
+        name = (county.get("countyname") or "") + (county.get("areaname") or "")
+        if "clarke" in name.lower():
+            logger.debug("HUD FMR: found Clarke County record (%s)", county.get("countyname"))
+            return county
+
+    logger.warning("HUD FMR: Athens-Clarke record not found in GA state response")
     return None
 
 
-# ── RentCafe ──────────────────────────────────────────────────────────────────
-
-_RENTCAFE_LABELS = {
-    0: ["studio", "Studio"],
-    1: ["1 Bedroom", "1-bedroom", "1BR", "One Bedroom"],
-    2: ["2 Bedroom", "2-bedroom", "2BR", "Two Bedroom"],
-    3: ["3 Bedroom", "3-bedroom", "3BR", "Three Bedroom"],
-    4: ["4 Bedroom", "4-bedroom", "4BR", "Four Bedroom"],
-}
-
-
-def scrape_rentcafe(beds: int) -> dict | None:
-    beds = max(0, min(int(beds), 4))
-    return _cached(f"rentcafe:{beds}", lambda: _do_rentcafe(beds))
-
-
-def _do_rentcafe(beds: int) -> dict | None:
-    url  = "https://www.rentcafe.com/average-rent-market-trends/us/ga/athens/"
-    html = _get(url)
-    if not html:
-        return None
-
-    for label in _RENTCAFE_LABELS.get(beds, ["2 Bedroom", "2BR"]):
-        pat = re.escape(label) + r"[^$\d]{0,60}\$\s*([\d,]+)"
-        m   = re.search(pat, html, re.IGNORECASE)
-        if m:
-            mid = int(m.group(1).replace(",", ""))
-            if 300 <= mid <= 8000:
-                return {
-                    "source":      "RentCafe",
-                    "mid":         mid,
-                    "low":         round(mid * 0.88),
-                    "high":        round(mid * 1.12),
-                    "sample_size": None,
-                }
-
-    # Fallback: generic averageRent JSON field
-    m = re.search(r'"averageRent"\s*:\s*(\d+)', html)
-    if m:
-        mid = int(m.group(1))
-        if 300 <= mid <= 8000:
-            return {
-                "source":      "RentCafe",
-                "mid":         mid,
-                "low":         round(mid * 0.88),
-                "high":        round(mid * 1.12),
-                "sample_size": None,
-            }
-
+def _extract_hud_fmr_value(data: dict, beds: int) -> int | None:
+    """Try multiple key name variants to extract the FMR for a given bedroom count."""
+    for key in _BED_TO_HUD_KEYS.get(beds, ["Two-Bedroom"]):
+        v = data.get(key)
+        if isinstance(v, (int, float)) and v > 0:
+            return int(v)
     return None

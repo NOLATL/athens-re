@@ -16,8 +16,11 @@ Usage:
   from backend.scrapers.distressed import fetch_tax_delinquents, fetch_fi_fa_liens
   parcels = fetch_tax_delinquents("clarke")
 """
+import json as _json
 import logging
 import time
+import urllib.parse
+import urllib.request
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -347,6 +350,79 @@ def fetch_code_violations(county: str = "clarke") -> list[dict]:
     return results
 
 
+# ── geocoding ─────────────────────────────────────────────────────────────────
+
+_GEO_CACHE: dict = {}   # address → (lat, lng) | None
+
+# ACC ArcGIS parcels feature service — Clarke County parcel centroids
+_ACC_PARCELS_LAYER = (
+    "https://services1.arcgis.com/Ug5xGQbHsD8zuZzM/arcgis/rest/services/"
+    "Parcels/FeatureServer/0/query"
+)
+
+
+def _geocode_address(address: str, county: str = "clarke") -> tuple | None:
+    """
+    Geocode an address to (lat, lng).
+
+    Strategy:
+      1. ACC ArcGIS parcels feature service (accurate, Clarke County only)
+      2. Nominatim / OpenStreetMap (free, no key, city-level fallback)
+
+    Results are cached per address for the lifetime of the process.
+    """
+    cache_key = address.strip().lower()
+    if cache_key in _GEO_CACHE:
+        return _GEO_CACHE[cache_key]
+
+    result = None
+
+    # 1 — ACC ArcGIS parcels (Clarke County only)
+    if county == "clarke" and address:
+        street = address.split(",")[0].strip()
+        params = {
+            "where": f"UPPER(SITUS_ADDR) LIKE UPPER('{street.replace(chr(39), chr(39)*2)}%')",
+            "outFields": "OBJECTID",
+            "returnGeometry": "true",
+            "outSR": "4326",
+            "f": "json",
+            "resultRecordCount": "1",
+        }
+        r = _get(_ACC_PARCELS_LAYER, params=params)
+        if r:
+            try:
+                data = r.json()
+                feats = data.get("features", [])
+                if feats:
+                    geom = feats[0].get("geometry", {})
+                    x, y = geom.get("x"), geom.get("y")
+                    if x is not None and y is not None and -90 <= y <= 90:
+                        result = (round(y, 6), round(x, 6))
+            except Exception as e:
+                logger.debug("ArcGIS geocode failed for '%s': %s", address, e)
+
+    # 2 — Nominatim fallback
+    if result is None and address:
+        query = f"{address}, Athens, GA, USA"
+        url = (
+            "https://nominatim.openstreetmap.org/search"
+            f"?q={urllib.parse.quote(query)}&format=json&limit=1&countrycodes=us"
+        )
+        try:
+            req = urllib.request.Request(
+                url, headers={"User-Agent": "AthensREPlatform/1.0 (private research tool)"}
+            )
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                hits = _json.loads(resp.read().decode())
+            if hits:
+                result = (round(float(hits[0]["lat"]), 6), round(float(hits[0]["lon"]), 6))
+        except Exception as e:
+            logger.debug("Nominatim geocode failed for '%s': %s", address, e)
+
+    _GEO_CACHE[cache_key] = result
+    return result
+
+
 # ── absentee owner check ──────────────────────────────────────────────────────
 
 def is_absentee_owner(parcel_id: str) -> bool:
@@ -397,6 +473,19 @@ def run_distress_pipeline(county: str = "clarke") -> list[dict]:
     _merge(fetch_tax_delinquents(county))
     _merge(fetch_fi_fa_liens(county))
     _merge(fetch_code_violations(county))
+
+    # Geocode any parcels that lack lat/lng so they appear on the map
+    logger.info("Geocoding parcels without coordinates...")
+    for p in all_parcels.values():
+        if p.get("lat") and p.get("lng"):
+            continue
+        addr = p.get("address", "")
+        if not addr:
+            continue
+        coords = _geocode_address(addr, p.get("county", "clarke"))
+        if coords:
+            p["lat"], p["lng"] = coords
+        time.sleep(1)   # respect Nominatim rate limit (1 req/sec)
 
     # Re-score merged parcels
     merged = [enrich_parcel(p) for p in all_parcels.values()]

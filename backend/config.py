@@ -34,8 +34,11 @@ SEARCH_CRITERIA = {
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///backend/db/real_estate.db")
 
 # ── API keys ─────────────────────────────────────────────────────────────────
-CENSUS_API_KEY = os.getenv("CENSUS_API_KEY", "")
+CENSUS_API_KEY     = os.getenv("CENSUS_API_KEY", "")
 RENTOMETER_API_KEY = os.getenv("RENTOMETER_API_KEY", "")
+# Free token from https://www.huduser.gov/hudapi/public/register
+# Used for HUD Fair Market Rent data (Athens-Clarke metro FMRs)
+HUD_API_TOKEN      = os.getenv("HUD_API_TOKEN", "")
 
 # ── Key Athens coordinates ────────────────────────────────────────────────────
 LOCATIONS = {

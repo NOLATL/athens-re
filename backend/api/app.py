@@ -50,6 +50,12 @@ def get_market_stats():
     return jsonify(_load("market_stats.json"))
 
 
+@app.get("/api/data-freshness")
+def get_data_freshness():
+    data = _load("data_freshness.json")
+    return jsonify(data if isinstance(data, dict) else {})
+
+
 @app.get("/api/development-projects")
 def get_development_projects():
     return jsonify(_load("development_projects.json"))
