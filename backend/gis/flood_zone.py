@@ -1,7 +1,5 @@
 """FEMA flood zone lookup for a lat/lng point."""
 import os
-import geopandas as gpd
-from shapely.geometry import Point
 from backend.config import SHAPEFILES
 
 FLOOD_INSURANCE_COST = {"AE": 2000, "A": 1800, "AO": 1500, "VE": 3000}  # annual est.
@@ -13,6 +11,12 @@ def get_flood_zone(lat: float, lng: float) -> dict:
 
     if not gdf_path or not os.path.exists(gdf_path):
         return result  # shapefiles not yet downloaded
+
+    try:
+        import geopandas as gpd
+        from shapely.geometry import Point
+    except ImportError:
+        return result  # geopandas not available in this environment
 
     for f in os.listdir(gdf_path):
         if not f.endswith(".shp"):

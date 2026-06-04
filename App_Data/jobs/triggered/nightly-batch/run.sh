@@ -1,13 +1,10 @@
 #!/bin/bash
 set -e
-echo "=== DIAG ==="
-echo "PYTHONHOME=$PYTHONHOME"
-echo "PYTHONPATH=$PYTHONPATH"
-echo "PATH=$PATH"
-/home/site/wwwroot/antenv/bin/python -c "import sys; print('EXE:', sys.executable); print('PATH:', sys.path)"
-/home/site/wwwroot/antenv/bin/python -c "import requests; print('requests OK')" || echo "requests MISSING"
-echo "=== END DIAG ==="
+
+cd /home/site/wwwroot
 unset PYTHONPATH
 unset PYTHONHOME
-cd /home/site/wwwroot
+
+echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] Starting Athens RE nightly batch..."
 /home/site/wwwroot/antenv/bin/python -m backend.jobs.nightly_batch --log-level INFO
+echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] Nightly batch finished."
