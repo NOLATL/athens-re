@@ -1,0 +1,31 @@
+name: Nightly Batch
+
+on:
+  schedule:
+    - cron: '0 7 * * *'   # 7am UTC = 3am ET (runs daily)
+  workflow_dispatch:       # allow manual trigger from GitHub Actions UI
+
+jobs:
+  trigger-batch:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger nightly batch on Azure
+        run: |
+          response=$(curl -s -o /tmp/batch_response.txt -w "%{http_code}" \
+            -X POST \
+            -H "X-Batch-Secret: ${{ secrets.BATCH_SECRET }}" \
+            "https://${{ secrets.AZURE_WEBAPP_NAME }}.azurewebsites.net/api/internal/run-batch")
+
+          body=$(cat /tmp/batch_response.txt)
+          echo "HTTP status: $response"
+          echo "Response body: $body"
+
+          if [ "$response" = "202" ]; then
+            echo "Batch started successfully."
+          elif [ "$response" = "409" ]; then
+            echo "Batch already running — skipping."
+          else
+            echo "ERROR: Unexpected status $response"
+            exit 1
+          fi
