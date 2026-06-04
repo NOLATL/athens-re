@@ -316,20 +316,16 @@ def _rent_status_for_result(rent_result: dict | None) -> dict:
 
 
 def _prewarm_rent_scrapers(listings: list[dict]) -> None:
-    """Pre-warm the rent scraper in-memory cache for each unique bed count.
+    """Fetch external rent data for all unique bed counts in one shared thread pool.
 
-    aggregate_rent_estimates() spins up a ThreadPoolExecutor per call to run
-    external scrapers in parallel.  When called sequentially for 350+ properties
-    that pattern creates hundreds of thread pools.  Calling the scrapers here once
-    per unique bedroom count populates the module-level cache so every subsequent
-    per-property call gets an instant cache hit without touching the network or
-    creating additional threads.
+    Returns after populating the module-level _cache in rent_sources so that
+    _batch_rent_estimate() can read results directly without spawning any
+    additional threads.
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
     from backend.scrapers.rent_sources import scrape_redfin_rentals, scrape_hud_fmr
 
-    unique_beds = {max(0, int(p.get("beds") or 0)) for p in listings}
-    unique_beds = {min(b, 5) for b in unique_beds}  # scraper clamps to 0-5
+    unique_beds = {min(max(0, int(p.get("beds") or 0)), 5) for p in listings}
 
     tasks = []
     for b in unique_beds:
@@ -351,11 +347,60 @@ def _prewarm_rent_scrapers(listings: list[dict]) -> None:
         logger.debug("Rent scraper prewarm error: %s", e)
 
 
+def _batch_rent_estimate(lat: float, lng: float, beds: int,
+                         sqft: int = 0, property_type: str = "",
+                         county: str = "clarke") -> dict:
+    """Fast rent estimate for batch use — no ThreadPoolExecutor.
+
+    Calls estimate_rent() (pure local model) then combines with any external
+    scraper data already in the module-level rent_sources cache populated by
+    _prewarm_rent_scrapers().  Reading the cache dict directly avoids the
+    per-property thread-pool create/shutdown overhead that makes the sequential
+    enrichment loop slow on Azure's throttled CPU.
+    """
+    import time
+    from backend.analysis.rent_estimator import estimate_rent as _estimate_rent
+    from backend.scrapers.rent_sources import _cache, _CACHE_TTL
+
+    internal = _estimate_rent(lat, lng, beds, sqft, property_type, county)
+    internal_source = {
+        "source": "Internal model",
+        "mid":    internal["mid"],
+        "low":    internal["low"],
+        "high":   internal["high"],
+        "method": internal["method"],
+    }
+
+    now = time.time()
+    beds_r = min(max(0, int(beds or 0)), 5)   # redfin clamps to 0-5
+    beds_h = min(beds_r, 4)                    # hud clamps to 0-4
+
+    external = []
+    for key in (f"redfin_rentals:{beds_r}", f"hud_fmr:{beds_h}"):
+        entry = _cache.get(key)
+        if entry and (now - entry[0]) < _CACHE_TTL and entry[1]:
+            external.append(entry[1])
+
+    all_sources = [internal_source] + external
+    mids = [s["mid"] for s in all_sources if s.get("mid")]
+
+    if len(mids) <= 1:
+        return {**internal, "sources": all_sources, "method": "internal_only"}
+
+    avg_mid = round(sum(mids) / len(mids))
+    return {
+        "mid":      avg_mid,
+        "low":      min(mids),
+        "high":     max(mids),
+        "method":   "aggregated",
+        "per_unit": internal["per_unit"],
+        "sources":  all_sources,
+    }
+
+
 def _enrich_listing(prop: dict, peers: list[dict] | None = None) -> dict:
     """Add rent estimate, cash flow, and composite investment score to a listing dict."""
     try:
-        aggregate_fn, _ = _ensure_analysis_functions()
-
         lat = prop.get("lat", 0)
         lng = prop.get("lng", 0)
         beds = prop.get("beds", 2)
@@ -364,7 +409,7 @@ def _enrich_listing(prop: dict, peers: list[dict] | None = None) -> dict:
         county = prop.get("county", "clarke")
         address = prop.get("address", "")
 
-        rent_result = aggregate_fn(lat, lng, beds, sqft, property_type, county, address)
+        rent_result = _batch_rent_estimate(lat, lng, beds, sqft, property_type, county)
         mid_rent = (rent_result or {}).get("mid", 0)
         price = _price_to_float(prop.get("price")) or 0.0
 
