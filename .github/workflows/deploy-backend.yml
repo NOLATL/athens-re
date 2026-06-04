@@ -38,8 +38,10 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies (validate requirements.txt)
-        run: pip install -r requirements.txt --quiet
+      - name: Build virtual environment for deployment
+        run: |
+          python -m venv antenv
+          ./antenv/bin/pip install -r requirements.txt --quiet
 
       - name: Cancel any in-progress Kudu deployment
         env:
