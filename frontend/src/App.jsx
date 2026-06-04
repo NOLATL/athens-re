@@ -483,12 +483,31 @@ function PropertyMap({ onLoadCalculator }) {
     if (!selected || cashFlowCache[selected]) return;
     const p = properties.find((x) => x.id === selected);
     if (!p) return;
+
     if (p.cash_flow && p.rent_estimate) {
       setCashFlowCache((prev) => ({
         ...prev,
         [selected]: { loading: false, data: { rent_estimate: p.rent_estimate, cash_flow: p.cash_flow } },
       }));
+      return;
     }
+
+    // Fall back to API when pre-computed data isn't available
+    const price = parseFloat((p.price || "").replace(/[$,~]/g, "").match(/[\d.]+/)?.[0] || "");
+    if (!price || isNaN(price)) return;
+    setCashFlowCache((prev) => ({ ...prev, [selected]: { loading: true } }));
+    const params = new URLSearchParams({
+      price, lat: p.lat, lng: p.lng,
+      beds: p.beds || 2, sqft: p.sqft || 0,
+      property_type: p.property_type || "",
+      county: p.county || "clarke",
+      hoa_monthly: p.hoa_monthly || 0,
+      address: p.address || "",
+    });
+    fetch(`${API_URL}/api/cash-flow?${params}`)
+      .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then((data) => setCashFlowCache((prev) => ({ ...prev, [selected]: { loading: false, data } })))
+      .catch(() => setCashFlowCache((prev) => ({ ...prev, [selected]: { loading: false, error: true } })));
   }, [selected, properties]);
 
   // Fetch comp analysis when a card is opened (on-demand, cached per property)
@@ -539,25 +558,64 @@ function PropertyMap({ onLoadCalculator }) {
     setTimeout(() => cardRefs.current[match.id]?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
   }, [properties]);
 
-  // Populate score cache from pre-computed property data (no API call needed)
+  // Populate score cache: use pre-computed fields when available, fall back to API for any gaps
   useEffect(() => {
     if (!properties.length) return;
-    const patch = {};
+    const precomputed = {};
+    const needsApi = [];
+
     for (const p of properties) {
-      if (scoreCache[p.id] || p.composite_score == null) continue;
-      patch[p.id] = {
-        loading: false,
-        data: {
-          composite_score: p.composite_score,
-          sub_scores: p.sub_scores || {},
-          cash_flow_detail: p.cash_flow || {},
-          proximity_detail: p.proximity_detail || null,
-          traffic_detail: p.traffic_detail || null,
-          flood_detail: p.flood_detail || null,
-        },
-      };
+      if (scoreCache[p.id]) continue;
+      if (p.composite_score != null) {
+        precomputed[p.id] = {
+          loading: false,
+          data: {
+            composite_score: p.composite_score,
+            sub_scores: p.sub_scores || {},
+            cash_flow_detail: p.cash_flow || {},
+            proximity_detail: p.proximity_detail || null,
+            traffic_detail: p.traffic_detail || null,
+            flood_detail: p.flood_detail || null,
+          },
+        };
+      } else if (p.lat && p.lng) {
+        const price = parseFloat((p.price || "").replace(/[$,~]/g, "").match(/[\d.]+/)?.[0] || "");
+        if (price && !isNaN(price)) needsApi.push(p);
+      }
     }
-    if (Object.keys(patch).length) setScoreCache((prev) => ({ ...prev, ...patch }));
+
+    if (Object.keys(precomputed).length) setScoreCache((prev) => ({ ...prev, ...precomputed }));
+
+    if (needsApi.length) {
+      const loadingPatch = Object.fromEntries(needsApi.map((p) => [p.id, { loading: true }]));
+      setScoreCache((prev) => ({ ...prev, ...loadingPatch }));
+      const body = needsApi.map((p) => ({
+        id: p.id,
+        price: parseFloat((p.price || "").replace(/[$,~]/g, "").match(/[\d.]+/)?.[0]),
+        lat: p.lat, lng: p.lng,
+        beds: p.beds || 2, sqft: p.sqft || 0,
+        property_type: p.property_type || "",
+        county: p.county || "clarke",
+        ...(p.year_built ? { year_built: p.year_built } : {}),
+      }));
+      fetch(`${API_URL}/api/score-batch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+        .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then((results) => {
+          const patch = {};
+          for (const [id, data] of Object.entries(results)) {
+            patch[id] = data.error ? { loading: false, error: true } : { loading: false, data };
+          }
+          setScoreCache((prev) => ({ ...prev, ...patch }));
+        })
+        .catch(() => {
+          const errPatch = Object.fromEntries(needsApi.map((p) => [p.id, { loading: false, error: true }]));
+          setScoreCache((prev) => ({ ...prev, ...errPatch }));
+        });
+    }
   }, [properties]);
 
   const filtered = properties
