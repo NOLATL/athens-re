@@ -577,7 +577,7 @@ def run(dry_run: bool = False) -> dict:
     )
 
     # ── Step 5: Enrich all listings with rent, cash flow, and composite score ─
-    logger.info("Enriching listings with rent estimates, cash flow, and scores...")
+    logger.info("Enriching listings with rent estimates, cash flow, and scores... [v4-thread-free]")
     # Pre-warm the external scraper cache for each unique bed count so that
     # the per-property _enrich_listing calls get instant cache hits and don't
     # each spin up their own ThreadPoolExecutor for HTTP requests.
