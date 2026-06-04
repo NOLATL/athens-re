@@ -41,6 +41,31 @@ jobs:
       - name: Install dependencies (validate requirements.txt)
         run: pip install -r requirements.txt --quiet
 
+      - name: Cancel any in-progress Kudu deployment
+        env:
+          PUBLISH_PROFILE: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        run: |
+          # Extract SCM credentials from the publish profile XML
+          SCM_URL=$(echo "$PUBLISH_PROFILE" | grep -oP 'publishUrl="\K[^"]+' | grep scm | head -1)
+          USER=$(echo "$PUBLISH_PROFILE" | grep -oP 'userName="\K[^"]+' | head -1)
+          PASS=$(echo "$PUBLISH_PROFILE" | grep -oP 'userPWD="\K[^"]+' | head -1)
+          if [ -z "$SCM_URL" ]; then
+            echo "Could not parse SCM URL — skipping cancellation"
+            exit 0
+          fi
+          echo "Checking for in-progress deployments at $SCM_URL..."
+          # Poll until no deployment is in-progress (status 0=pending,1=building,2=deploying)
+          for i in $(seq 1 10); do
+            STATUS=$(curl -s -u "$USER:$PASS" "https://$SCM_URL/api/deployments/latest" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('status',4))" 2>/dev/null || echo "4")
+            echo "Deployment status: $STATUS"
+            if [ "$STATUS" -ge 3 ]; then
+              echo "No in-progress deployment — proceeding."
+              break
+            fi
+            echo "Deployment in progress, waiting 15s (attempt $i/10)..."
+            sleep 15
+          done
+
       - name: Deploy to Azure App Service
         uses: azure/webapps-deploy@v3
         with:
