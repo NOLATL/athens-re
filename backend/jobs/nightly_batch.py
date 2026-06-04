@@ -315,6 +315,42 @@ def _rent_status_for_result(rent_result: dict | None) -> dict:
     return {"status": "estimated", "source_count": source_count, "message": method or "Estimated"}
 
 
+def _prewarm_rent_scrapers(listings: list[dict]) -> None:
+    """Pre-warm the rent scraper in-memory cache for each unique bed count.
+
+    aggregate_rent_estimates() spins up a ThreadPoolExecutor per call to run
+    external scrapers in parallel.  When called sequentially for 350+ properties
+    that pattern creates hundreds of thread pools.  Calling the scrapers here once
+    per unique bedroom count populates the module-level cache so every subsequent
+    per-property call gets an instant cache hit without touching the network or
+    creating additional threads.
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from backend.scrapers.rent_sources import scrape_redfin_rentals, scrape_hud_fmr
+
+    unique_beds = {max(0, int(p.get("beds") or 0)) for p in listings}
+    unique_beds = {min(b, 5) for b in unique_beds}  # scraper clamps to 0-5
+
+    tasks = []
+    for b in unique_beds:
+        tasks.append(("redfin", b, lambda b=b: scrape_redfin_rentals(b)))
+        tasks.append(("hud",    b, lambda b=b: scrape_hud_fmr(b)))
+
+    logger.info("Pre-warming rent scraper cache for bed counts: %s", sorted(unique_beds))
+    try:
+        with ThreadPoolExecutor(max_workers=min(len(tasks), 8)) as pool:
+            futures = {pool.submit(fn): (src, b) for src, b, fn in tasks}
+            for f in as_completed(futures, timeout=30):
+                src, b = futures[f]
+                try:
+                    result = f.result()
+                    logger.debug("Scraper %s beds=%d → %s", src, b, "ok" if result else "no data")
+                except Exception as e:
+                    logger.debug("Scraper %s beds=%d error: %s", src, b, e)
+    except Exception as e:
+        logger.debug("Rent scraper prewarm error: %s", e)
+
+
 def _enrich_listing(prop: dict, peers: list[dict] | None = None) -> dict:
     """Add rent estimate, cash flow, and composite investment score to a listing dict."""
     try:
@@ -497,6 +533,10 @@ def run(dry_run: bool = False) -> dict:
 
     # ── Step 5: Enrich all listings with rent, cash flow, and composite score ─
     logger.info("Enriching listings with rent estimates, cash flow, and scores...")
+    # Pre-warm the external scraper cache for each unique bed count so that
+    # the per-property _enrich_listing calls get instant cache hits and don't
+    # each spin up their own ThreadPoolExecutor for HTTP requests.
+    _prewarm_rent_scrapers(listings)
     enriched_listings = [_enrich_listing(dict(p), peers=listings) for p in listings]
 
     # Assign global ranks by composite_score (rank 1 = best investment)
