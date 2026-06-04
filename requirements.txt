@@ -11,3 +11,4 @@ gunicorn>=22.0
 beautifulsoup4>=4.12
 lxml>=5.0
 numpy>=1.26
+scipy>=1.13
