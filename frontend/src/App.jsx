@@ -597,6 +597,8 @@ function PropertyMap({ onLoadCalculator }) {
         property_type: p.property_type || "",
         county: p.county || "clarke",
         ...(p.year_built ? { year_built: p.year_built } : {}),
+        // Skip re-scraping rent when batch already computed it
+        ...(p.rent_estimate?.mid ? { rent_override: p.rent_estimate.mid } : {}),
       }));
       fetch(`${API_URL}/api/score-batch`, {
         method: "POST",
