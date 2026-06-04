@@ -383,9 +383,7 @@ function PropertyMap({ onLoadCalculator }) {
   const [trafficCache, setTrafficCache] = useState({});
   const markerRefs = useRef({});
   const cardRefs = useRef({});
-  const fetchedCashFlow = useRef(new Set());
   const fetchedComps = useRef(new Set());
-  const fetchedScore = useRef(new Set());
   const fetchedTraffic = useRef(new Set());
 
   const dismissProperty = (id) => {
@@ -480,36 +478,17 @@ function PropertyMap({ onLoadCalculator }) {
     if (ref) ref.openPopup();
   }, [selected]);
 
-  // Fetch cash flow analysis when a card is opened (on-demand, cached per property)
+  // Populate cash flow cache from pre-computed property data when a card is opened
   useEffect(() => {
-    if (!selected || fetchedCashFlow.current.has(selected)) return;
+    if (!selected || cashFlowCache[selected]) return;
     const p = properties.find((x) => x.id === selected);
     if (!p) return;
-    const price = parseFloat((p.price || "").replace(/[$,~]/g, "").match(/[\d.]+/)?.[0] || "");
-    if (!price || isNaN(price)) return;
-
-    fetchedCashFlow.current.add(selected);
-    setCashFlowCache((prev) => ({ ...prev, [selected]: { loading: true } }));
-
-    const params = new URLSearchParams({
-      price,
-      lat: p.lat,
-      lng: p.lng,
-      beds: p.beds || 2,
-      sqft: p.sqft || 0,
-      property_type: p.property_type || "",
-      county: p.county || "clarke",
-      hoa_monthly: p.hoa_monthly || 0,
-      address: p.address || "",
-    });
-
-    fetch(`${API_URL}/api/cash-flow?${params}`)
-      .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then((data) => setCashFlowCache((prev) => ({ ...prev, [selected]: { loading: false, data } })))
-      .catch(() => {
-        fetchedCashFlow.current.delete(selected);
-        setCashFlowCache((prev) => ({ ...prev, [selected]: { loading: false, error: true } }));
-      });
+    if (p.cash_flow && p.rent_estimate) {
+      setCashFlowCache((prev) => ({
+        ...prev,
+        [selected]: { loading: false, data: { rent_estimate: p.rent_estimate, cash_flow: p.cash_flow } },
+      }));
+    }
   }, [selected, properties]);
 
   // Fetch comp analysis when a card is opened (on-demand, cached per property)
@@ -560,48 +539,25 @@ function PropertyMap({ onLoadCalculator }) {
     setTimeout(() => cardRefs.current[match.id]?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
   }, [properties]);
 
-  // Pre-fetch scores for all properties in one batch request
+  // Populate score cache from pre-computed property data (no API call needed)
   useEffect(() => {
     if (!properties.length) return;
-    const toScore = properties.filter((p) => {
-      if (fetchedScore.current.has(p.id) || !p.lat || !p.lng) return false;
-      const price = parseFloat((p.price || "").replace(/[$,~]/g, "").match(/[\d.]+/)?.[0] || "");
-      return price && !isNaN(price);
-    });
-    if (!toScore.length) return;
-
-    toScore.forEach((p) => fetchedScore.current.add(p.id));
-    const loadingPatch = Object.fromEntries(toScore.map((p) => [p.id, { loading: true }]));
-    setScoreCache((prev) => ({ ...prev, ...loadingPatch }));
-
-    const body = toScore.map((p) => ({
-      id: p.id,
-      price: parseFloat((p.price || "").replace(/[$,~]/g, "").match(/[\d.]+/)?.[0]),
-      lat: p.lat, lng: p.lng,
-      beds: p.beds || 2, sqft: p.sqft || 0,
-      property_type: p.property_type || "",
-      county: p.county || "clarke",
-      ...(p.year_built ? { year_built: p.year_built } : {}),
-    }));
-
-    fetch(`${API_URL}/api/score-batch`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    })
-      .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then((results) => {
-        const patch = {};
-        for (const [id, data] of Object.entries(results)) {
-          patch[id] = data.error ? { loading: false, error: true } : { loading: false, data };
-        }
-        setScoreCache((prev) => ({ ...prev, ...patch }));
-      })
-      .catch(() => {
-        toScore.forEach((p) => fetchedScore.current.delete(p.id));
-        const errPatch = Object.fromEntries(toScore.map((p) => [p.id, { loading: false, error: true }]));
-        setScoreCache((prev) => ({ ...prev, ...errPatch }));
-      });
+    const patch = {};
+    for (const p of properties) {
+      if (scoreCache[p.id] || p.composite_score == null) continue;
+      patch[p.id] = {
+        loading: false,
+        data: {
+          composite_score: p.composite_score,
+          sub_scores: p.sub_scores || {},
+          cash_flow_detail: p.cash_flow || {},
+          proximity_detail: p.proximity_detail || null,
+          traffic_detail: p.traffic_detail || null,
+          flood_detail: p.flood_detail || null,
+        },
+      };
+    }
+    if (Object.keys(patch).length) setScoreCache((prev) => ({ ...prev, ...patch }));
   }, [properties]);
 
   const filtered = properties

@@ -36,6 +36,16 @@ STATE_FILE = os.path.join(DATA_DIR, "last_run_state.json")
 PROPERTIES_FILE = os.path.join(DATA_DIR, "properties.json")
 DISTRESSED_FILE = os.path.join(DATA_DIR, "distressed_parcels.json")
 
+
+def _haversine(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    """Return distance in miles between two lat/lng points."""
+    import math
+    R = 3958.8
+    a = (math.sin(math.radians(lat2 - lat1) / 2) ** 2
+         + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2))
+         * math.sin(math.radians(lng2 - lng1) / 2) ** 2)
+    return R * 2 * math.asin(math.sqrt(a))
+
 # Module-level references populated lazily to avoid circular import at top level
 aggregate_rent_estimates = None
 analyze = None
@@ -305,10 +315,10 @@ def _rent_status_for_result(rent_result: dict | None) -> dict:
     return {"status": "estimated", "source_count": source_count, "message": method or "Estimated"}
 
 
-def _enrich_listing(prop: dict) -> dict:
+def _enrich_listing(prop: dict, peers: list[dict] | None = None) -> dict:
     """Add rent estimate, cash flow, and composite investment score to a listing dict."""
     try:
-        aggregate_fn, analyze_fn = _ensure_analysis_functions()
+        aggregate_fn, _ = _ensure_analysis_functions()
 
         lat = prop.get("lat", 0)
         lng = prop.get("lng", 0)
@@ -322,17 +332,36 @@ def _enrich_listing(prop: dict) -> dict:
         mid_rent = (rent_result or {}).get("mid", 0)
         price = _price_to_float(prop.get("price")) or 0.0
 
-        cf = {}
-        if price > 0 and mid_rent > 0:
-            cf = analyze_fn(price, mid_rent, county)
-
         prop["rent_estimate"] = rent_result
-        prop["cash_flow"] = cf
         prop["rent_status"] = _rent_status_for_result(rent_result)
 
         if price > 0 and mid_rent > 0:
             try:
                 from backend.analysis.property_scorer import composite_score as _composite_score
+
+                # Compute comp_avg_price from peers so entry_price sub-score is accurate
+                comp_avg_price = None
+                if peers:
+                    comp_prices = []
+                    eff_lat = lat or 33.945
+                    eff_lng = lng or -83.4
+                    for peer in peers:
+                        if peer.get("county", "clarke") != county:
+                            continue
+                        if abs(int(peer.get("beds") or 0) - int(beds or 0)) > 1:
+                            continue
+                        p_lat, p_lng = peer.get("lat"), peer.get("lng")
+                        if not p_lat or not p_lng:
+                            continue
+                        if _haversine(eff_lat, eff_lng, float(p_lat), float(p_lng)) > 4.0:
+                            continue
+                        peer_price = _price_to_float(peer.get("price"))
+                        if peer_price:
+                            comp_prices.append(peer_price)
+                    if comp_prices:
+                        comp_prices.sort()
+                        comp_avg_price = comp_prices[len(comp_prices) // 2]
+
                 score_result = _composite_score(
                     purchase_price=price,
                     estimated_rent=mid_rent,
@@ -340,14 +369,26 @@ def _enrich_listing(prop: dict) -> dict:
                     lng=lng or -83.4,
                     county=county,
                     year_built=prop.get("year_built"),
+                    comp_avg_price=comp_avg_price,
                 )
                 prop["composite_score"] = score_result.get("composite_score")
                 prop["sub_scores"] = score_result.get("sub_scores", {})
+                # Store the full detail fields so the frontend can use pre-computed data
+                prop["cash_flow"] = score_result.get("cash_flow_detail", {})
+                prop["proximity_detail"] = score_result.get("proximity_detail")
+                prop["traffic_detail"] = score_result.get("traffic_detail")
+                prop["flood_detail"] = score_result.get("flood_detail")
             except Exception as e:
                 logger.debug("Score failed for %s: %s", address, e)
+                # Fall back to plain cash flow so the field is always present
+                from backend.analysis.cash_flow_engine import analyze as _analyze
+                prop["cash_flow"] = _analyze(price, mid_rent, county)
+        else:
+            prop["cash_flow"] = {}
 
     except Exception as e:
         prop["rent_status"] = _rent_status_for_result(None)
+        prop["cash_flow"] = {}
         logger.warning("Rent enrichment failed for %s: %s", prop.get("address"), e)
 
     return prop
@@ -456,7 +497,7 @@ def run(dry_run: bool = False) -> dict:
 
     # ── Step 5: Enrich all listings with rent, cash flow, and composite score ─
     logger.info("Enriching listings with rent estimates, cash flow, and scores...")
-    enriched_listings = [_enrich_listing(dict(p)) for p in listings]
+    enriched_listings = [_enrich_listing(dict(p), peers=listings) for p in listings]
 
     # Assign global ranks by composite_score (rank 1 = best investment)
     scored = sorted(
