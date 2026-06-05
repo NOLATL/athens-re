@@ -15,7 +15,7 @@ jobs:
           response=$(curl -s -o /tmp/batch_response.txt -w "%{http_code}" \
             -X POST \
             -H "X-Batch-Secret: ${{ secrets.BATCH_SECRET }}" \
-            "https://${{ secrets.AZURE_WEBAPP_NAME }}.azurewebsites.net/api/internal/run-batch")
+            "https://athens-re-avgqcah6hufjhdbx.westus2-01.azurewebsites.net/api/internal/run-batch")
 
           body=$(cat /tmp/batch_response.txt)
           echo "HTTP status: $response"
