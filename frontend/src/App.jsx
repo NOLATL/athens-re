@@ -768,7 +768,7 @@ function PropertyMap({ onLoadCalculator }) {
                     <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                       <a href={`https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}`} target="_blank" rel="noopener noreferrer" style={{ padding: "5px 12px", border: "1px solid #8b5cf6", color: "#8b5cf6", borderRadius: "4px", fontSize: "11px", fontWeight: 700, textDecoration: "none" }}>Google Maps ↗</a>
                       <a href={p.url} target="_blank" rel="noopener noreferrer" style={{ padding: "5px 12px", border: "1px solid #8b5cf6", color: "#8b5cf6", borderRadius: "4px", fontSize: "11px", fontWeight: 700, textDecoration: "none" }}>Redfin ↗</a>
-                      <a href={`https://www.zillow.com/homes/${encodeURIComponent(p.address.split(",")[0])}_rb/`} target="_blank" rel="noopener noreferrer" style={{ padding: "5px 12px", border: "1px solid #8b5cf6", color: "#8b5cf6", borderRadius: "4px", fontSize: "11px", fontWeight: 700, textDecoration: "none" }}>Zillow ↗</a>
+                      <a href={`https://www.zillow.com/homes/${p.address.replace(/,\s*/g, '-').replace(/\s+/g, '-')}_rb/`} target="_blank" rel="noopener noreferrer" style={{ padding: "5px 12px", border: "1px solid #8b5cf6", color: "#8b5cf6", borderRadius: "4px", fontSize: "11px", fontWeight: 700, textDecoration: "none" }}>Zillow ↗</a>
                     </div>
                   </div>
                 </Popup>
@@ -1097,7 +1097,7 @@ function PropertyMap({ onLoadCalculator }) {
                         style={{ padding: "6px 14px", color: COLORS.accent, border: `1px solid ${COLORS.accent}40`, borderRadius: "5px", fontSize: "12px", fontWeight: 700, textDecoration: "none" }}>Google Maps ↗</a>
                       <a href={p.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
                         style={{ padding: "6px 14px", color: COLORS.accent, border: `1px solid ${COLORS.accent}40`, borderRadius: "5px", fontSize: "12px", fontWeight: 700, textDecoration: "none" }}>Redfin ↗</a>
-                      <a href={`https://www.zillow.com/homes/${encodeURIComponent(p.address.split(",")[0])}_rb/`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
+                      <a href={`https://www.zillow.com/homes/${p.address.replace(/,\s*/g, '-').replace(/\s+/g, '-')}_rb/`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
                         style={{ padding: "6px 14px", color: COLORS.accent, border: `1px solid ${COLORS.accent}40`, borderRadius: "5px", fontSize: "12px", fontWeight: 700, textDecoration: "none" }}>Zillow ↗</a>
                       {onLoadCalculator && (
                         <button onClick={(e) => {
