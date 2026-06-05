@@ -2,7 +2,7 @@ name: Nightly Batch
 
 on:
   schedule:
-    - cron: '0 7 * * *'   # 7am UTC = 3am ET (runs daily)
+    - cron: '0 8 * * *'   # 8am UTC = 4am ET (runs daily, finishes by ~6am ET)
   workflow_dispatch:       # allow manual trigger from GitHub Actions UI
 
 jobs:
