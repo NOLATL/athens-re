@@ -1499,7 +1499,7 @@ function DocsModal({ onClose }) {
 
         <h3 style={S.h3}>Rent Estimation</h3>
         <p style={S.p}><strong>Internal model:</strong> Starts from Athens market-average base rents by bedroom count (RentCafe/Zillow/RentHop, Mar 2026), adjusted by census tract median gross rent (ACS 5-year, ±35% clamp), UGA proximity premium (+15% ≤0.5mi, +8% ≤1.0mi), and Oconee school district premium (+8%). Output is a mid estimate ±12% range.</p>
-        <p style={S.p}><strong>External sources:</strong> Craigslist Athens (/apa listings, percentile-based), Zumper market median (per-bedroom page), RentCafe market trends. All three scraped in parallel and cached for 1 hour. The displayed rent and the number used in scoring is the simple average of all source mids that return a result. The range shown is min–max across sources.</p>
+        <p style={S.p}><strong>External sources:</strong> Redfin active rental listings (percentile-based by bedroom count) and HUD Fair Market Rents (county-level published rates). Both scraped in parallel and cached for 1 hour. The displayed rent and the number used in scoring is the simple average of all source mids that return a result. The range shown is min–max across sources.</p>
 
         <h3 style={S.h3}>Cash Flow Model Assumptions</h3>
         <table style={S.table}>
@@ -1507,7 +1507,7 @@ function DocsModal({ onClose }) {
           <tbody>
             {[
               ["Down payment", "20%", "Conventional investment loan"],
-              ["Mortgage rate", "7.0%", "Typical investor rate Mar 2026; adjustable in Cash Flow Calculator tab"],
+              ["Mortgage rate", "7.0%", "Typical investor rate mid-2026; adjustable in Cash Flow Calculator tab"],
               ["Loan term", "30 years", "Fixed amortization"],
               ["Property tax", "Clarke 1.17% / Oconee 0.85%", "Non-homestead (investor) millage; Clarke at 33.95 mills"],
               ["Insurance", "Clarke $1,200/yr / Oconee $1,400/yr", "Market estimate; get quotes — Georgia costs rising"],
@@ -1525,7 +1525,7 @@ function DocsModal({ onClose }) {
         <p style={S.p}>Listing data: Redfin, Zillow, Compass, Homes.com, Movoto, Mashvisor · Rent data: RentCafe, Rent.com, RentHop, Zumper, Craigslist Athens · Demographics: ACS 5-Year Census (tract-level) · Traffic: GDOT AADT counts for major Athens corridors · Zoning: ACC Unified Development Ordinance GeoJSON · Flood: FEMA NFHL via ACC open data · Proximity: Haversine distance to UGA, downtown, Epps Bridge, schools, transit · Market context: Flagpole Athens, Athens CEO, 5Market Realty, ACC Gov, UGA Today</p>
 
         <h3 style={S.h3}>Limitations</h3>
-        <p style={S.p}>All data as of March 31, 2026. Listing prices and availability change daily — verify before acting. Rent estimates are algorithmic and may not reflect current micro-market conditions. Distressed parcel data is seeded; not pulled live from county records. Nothing here is financial or legal advice.</p>
+        <p style={S.p}>Listing data updates nightly. Listing prices and availability change daily — verify before acting. Rent estimates are algorithmic and may not reflect current micro-market conditions. Distressed parcel data is refreshed nightly; some county data sources may be temporarily unavailable. Nothing here is financial or legal advice.</p>
       </div>
     </div>
   );
@@ -1546,15 +1546,15 @@ function FAQModal({ onClose }) {
   };
   const faqs = [
     ["How is the investment score calculated?", "The composite score (0–100) blends five components: Cash Flow (35%), Appreciation potential (25%), Entry Price vs. comps (20%), Demand signals (10%), and Risk (10%). Cash flow is the dominant driver — a property that doesn't pencil at current rates will score poorly regardless of location. See Documentation for the full math."],
-    ["Why does a property show a score before I click it?", "All visible properties are batch-scored in a single background request when the page loads. This uses a parallel processing endpoint that scores all listings simultaneously rather than one at a time, so scores are ready before you expand a card."],
+    ["Why does a property show a score before I click it?", "Scores are pre-computed nightly by an automated batch job and stored server-side, so they load instantly with the listing data — no per-property calculation happens on page load. Cash flow details load on demand when you expand a card."],
     ["What does the green/red dot next to the score mean?", "Green = positive monthly cash flow at the default assumptions (20% down, 7% rate, 8% vacancy, 8% management, 1% maintenance). Red = negative. Hover over the dot to see the exact monthly cash flow amount."],
-    ["How accurate are the rent estimates?", "The internal model is calibrated to Athens March 2026 market data and adjusts for census tract, UGA proximity, and county. External sources (Craigslist, Zumper, RentCafe) are city-wide market medians by bedroom count — they don't reflect micro-neighborhood premiums. The averaged figure is a reasonable starting point; always verify with a local PM or active rental comps before underwriting."],
+    ["How accurate are the rent estimates?", "The internal model is calibrated to Athens 2026 market data and adjusts for census tract, UGA proximity, and county. External sources (Redfin rental listings, HUD Fair Market Rents) are market-level benchmarks by bedroom count — they don't reflect micro-neighborhood premiums. The averaged figure is a reasonable starting point; always verify with a local PM or active rental comps before underwriting."],
     ["What is a Distressed Parcel and why does it matter?", "A distressed parcel is a property with public-record signals of financial or physical deterioration: tax delinquency, fi fa liens, code violations, or absentee ownership. These properties rarely appear on Zillow or Redfin. The opportunity is buying at a significant discount to land value — especially in high-demand corridors where the land is worth more than the structure. The owner is often motivated."],
     ["What do the distressed tier colors mean?", "Red = Critical (score 70+): multiple serious signals, likely near tax sale. Orange = High (50–69): significant distress, owner likely motivated. Yellow = Watch (30–49): early signals, worth monitoring. Score is additive across signals — see Documentation for the full point breakdown."],
     ["How do I use this for outreach to distressed owners?", "The opportunity card shows the owner's mailing address (from qPublic county records). For absentee-owned properties, this is their out-of-state or out-of-area address. A direct mail campaign to the top 5–10 critical-distress parcels in target corridors is a high-ROI prospecting strategy."],
     ["What's the difference between Clarke and Oconee County properties?", "Clarke County has higher tax rates (33.95 mills, no investor exemptions), lower entry prices, and UGA-driven rental demand — better for cash flow. Oconee County has lower taxes, top-ranked schools, and higher median prices — better as an appreciation play or owner-occupied purchase. Most properties on this platform are Clarke County."],
     ["Why does the top-N slider exist?", "Ranking by composite score means the best cash-flow properties are always at the top. The slider lets you focus map pins on only the strongest candidates — e.g. 'show me the top 10 single-family homes' — reducing visual clutter on the map."],
-    ["How current is the data?", "Listing data and market stats are as of March 31, 2026. Rent scrapers (Craigslist, Zumper, RentCafe) update live when you expand a card, cached for 1 hour. Census data is ACS 5-year estimates (2019–2023). GDOT traffic counts are from the most recent annual publication. Distressed parcel data is seeded and does not update automatically yet."],
+    ["How current is the data?", "Listing data updates nightly via an automated batch job — the 'last updated' date in the header reflects the most recent run. Rent scrapers (Redfin Rentals, HUD Fair Market Rents) run live when you expand a card, cached for 1 hour. Census data is ACS 5-year estimates (2019–2023). GDOT traffic counts are from the most recent annual publication. Distressed parcel data is refreshed nightly; some county data sources may be temporarily unavailable."],
     ["This isn't financial advice, right?", "Correct. This platform compiles public data and applies algorithmic scoring to aid research. It is not a substitute for professional appraisal, legal review, title search, physical inspection, or financial advice. Always verify all figures independently before making investment decisions."],
   ];
   return (
@@ -1631,7 +1631,7 @@ export default function App() {
 
         <div style={{ marginTop: "28px", padding: "16px", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: "8px", fontSize: "11px", color: COLORS.textDim, lineHeight: 1.5 }}>
           <strong style={{ color: COLORS.accent }}>Data Sources:</strong> Zillow, Redfin, RentCafe, Rent.com, RentHop, Homes.com, Movoto, Mashvisor, Compass, Flagpole Athens, Athens CEO, 5Market Realty Market Reports, ACC Gov, GDOT, UGA Today, UGA Student Affairs, Friends of the Greenway ·{" "}
-          <strong style={{ color: COLORS.accent }}>As of:</strong> March 31, 2026 ·{" "}
+          <strong style={{ color: COLORS.accent }}>Data updated:</strong> {dataAsOf} ·{" "}
           <br />
           <strong style={{ color: COLORS.accent }}>Disclaimer:</strong> Research compiled from public sources. Not financial advice. Verify all data independently before making investment decisions.
         </div>
