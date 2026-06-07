@@ -49,7 +49,7 @@ const PROPERTIES = [
     county: "clarke",
     confidence: "high",
     rent: "$2,000/mo (est. $1,000/side)",
-    why: "Best entry-level cash flow play on the market. One side freshly updated (new LVP, granite countertops) and VACANT — you set the rent. Other side tenant-occupied for immediate income. Near UGA, downtown, and Loop 10. At $305K with 25% down, monthly mortgage ~$1,450. Two sides at $1,000 each = positive cash flow from day one.",
+    why: "Best entry-level cash flow play on the market. One side freshly updated (new LVP, granite countertops) and VACANT — you set the rent. Other side tenant-occupied for immediate income. Near UGA, downtown, and Loop 10. At $305K with 10% down, monthly mortgage ~$1,735. Two sides at $1,000 each = positive cash flow from day one.",
     url: "https://www.redfin.com/city/36057/GA/Athens-Clarke/multi-family-homes-for-sale",
     lat: 33.934262,
     lng: -83.340972,
@@ -1231,7 +1231,7 @@ function MarketOverview() {
 
 function CashFlowCalc({ seed }) {
   const [price, setPrice] = useState(275000);
-  const [down, setDown] = useState(25);
+  const [down, setDown] = useState(10);
   const [rate, setRate] = useState(6.5);
   const [rent, setRent] = useState(1800);
   const lastSeedRef = useRef(null);
@@ -1512,7 +1512,7 @@ function DocsModal({ onClose }) {
           <thead><tr><th style={S.th}>Assumption</th><th style={S.th}>Default</th><th style={S.th}>Notes</th></tr></thead>
           <tbody>
             {[
-              ["Down payment", "20%", "Conventional investment loan"],
+              ["Down payment", "10%", "Minimum conventional investment loan"],
               ["Mortgage rate", "7.0%", "Typical investor rate mid-2026; adjustable in Cash Flow Calculator tab"],
               ["Loan term", "30 years", "Fixed amortization"],
               ["Property tax", "Clarke 1.17% / Oconee 0.85%", "Non-homestead (investor) millage; Clarke at 33.95 mills"],
@@ -1553,7 +1553,7 @@ function FAQModal({ onClose }) {
   const faqs = [
     ["How is the investment score calculated?", "The composite score (0–100) blends five components: Cash Flow (35%), Appreciation potential (25%), Entry Price vs. comps (20%), Demand signals (10%), and Risk (10%). Cash flow is the dominant driver — a property that doesn't pencil at current rates will score poorly regardless of location. See Documentation for the full math."],
     ["Why does a property show a score before I click it?", "Scores are pre-computed nightly by an automated batch job and stored server-side, so they load instantly with the listing data — no per-property calculation happens on page load. Cash flow details load on demand when you expand a card."],
-    ["What does the green/red dot next to the score mean?", "Green = positive monthly cash flow at the default assumptions (20% down, 7% rate, 8% vacancy, 8% management, 1% maintenance). Red = negative. Hover over the dot to see the exact monthly cash flow amount."],
+    ["What does the green/red dot next to the score mean?", "Green = positive monthly cash flow at the default assumptions (10% down, 6.5% rate, 5% vacancy, 10% management, 5% maintenance). Red = negative. Hover over the dot to see the exact monthly cash flow amount."],
     ["How accurate are the rent estimates?", "The internal model is calibrated to Athens 2026 market data and adjusts for census tract, UGA proximity, and county. External sources (Redfin rental listings, HUD Fair Market Rents) are market-level benchmarks by bedroom count — they don't reflect micro-neighborhood premiums. The averaged figure is a reasonable starting point; always verify with a local PM or active rental comps before underwriting."],
     ["What is a Distressed Parcel and why does it matter?", "A distressed parcel is a property with public-record signals of financial or physical deterioration: tax delinquency, fi fa liens, code violations, or absentee ownership. These properties rarely appear on Zillow or Redfin. The opportunity is buying at a significant discount to land value — especially in high-demand corridors where the land is worth more than the structure. The owner is often motivated."],
     ["What do the distressed tier colors mean?", "Red = Critical (score 70+): multiple serious signals, likely near tax sale. Orange = High (50–69): significant distress, owner likely motivated. Yellow = Watch (30–49): early signals, worth monitoring. Score is additive across signals — see Documentation for the full point breakdown."],
