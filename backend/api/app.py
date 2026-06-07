@@ -18,6 +18,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 app = Flask(__name__)
 CORS(app)
 
+import threading as _threading
+_batch_running_lock = _threading.Lock()
+
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "reference")
 
 # Cache entries: filename → (mtime, data)
@@ -636,6 +639,37 @@ def get_permit_activity():
     except Exception:
         import traceback
         return jsonify({"error": "permit lookup failed", "detail": traceback.format_exc()}), 500
+
+
+@app.post("/api/internal/run-batch")
+def run_batch_endpoint():
+    """
+    Trigger the nightly batch job from GitHub Actions (or any authorized caller).
+    Requires X-Batch-Secret header matching the BATCH_SECRET environment variable.
+    Returns 202 immediately; batch runs in a background thread.
+    Returns 409 if a batch is already running.
+    """
+    import threading, sys, subprocess
+
+    secret = os.environ.get("BATCH_SECRET", "")
+    if not secret or request.headers.get("X-Batch-Secret") != secret:
+        return jsonify({"error": "unauthorized"}), 401
+
+    if not _batch_running_lock.acquire(blocking=False):
+        return jsonify({"status": "already_running"}), 409
+
+    def _run():
+        try:
+            cwd = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+            subprocess.run(
+                [sys.executable, "-m", "backend.jobs.nightly_batch", "--log-level", "INFO"],
+                cwd=cwd,
+            )
+        finally:
+            _batch_running_lock.release()
+
+    threading.Thread(target=_run, daemon=True).start()
+    return jsonify({"status": "started"}), 202
 
 
 @app.get("/api/health")
