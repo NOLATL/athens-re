@@ -4,9 +4,14 @@ on:
   schedule:
     - cron: '0 8 * * *'   # 8am UTC = 4am ET (runs daily, finishes by ~6am ET)
   workflow_dispatch:       # allow manual trigger from GitHub Actions UI
+  workflow_run:            # auto-run after every successful backend deploy
+    workflows: ["Deploy Backend"]
+    types: [completed]
 
 jobs:
   trigger-batch:
+    # Skip if triggered by a failed backend deploy
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
 
     steps:
