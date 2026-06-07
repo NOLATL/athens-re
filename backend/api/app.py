@@ -196,7 +196,7 @@ def get_census_tracts():
       fields  str   comma-separated list of demographic fields to include in
                     properties (default: all). E.g. ?fields=median_household_income,renter_pct
     """
-    from backend.gis.census_demographics import load_census_geojson, get_census_overlay_path
+    from backend.gis.census_demographics import load_census_geojson
 
     data = load_census_geojson()
     if data is None:
@@ -362,7 +362,6 @@ def get_score():
             mid_rent = estimate_rent(lat, lng, beds, sqft, property_type, county)["mid"]
 
         # Comp median price for entry-price scoring
-        import math, re
         def _hav(la1, lo1, la2, lo2):
             R = 3958.8
             a = math.sin(math.radians(la2 - la1) / 2) ** 2 + math.cos(math.radians(la1)) * math.cos(math.radians(la2)) * math.sin(math.radians(lo2 - lo1) / 2) ** 2
@@ -502,8 +501,6 @@ def get_comps():
       subject_price_per_sqft, fair_value_estimate (if sqft known),
       price_vs_comps_pct (positive = above market)
     """
-    import math, re
-
     try:
         price = float(request.args["price"])
     except (KeyError, ValueError):
@@ -586,7 +583,7 @@ def get_traffic():
     Query params:
       lat        float  latitude  (default Athens centroid)
       lng        float  longitude
-      radius_mi  float  search radius in miles (default 0.75)
+      radius_mi  float  search radius in miles (default 2.0)
 
     Returns traffic corridor details including AADT, road type, tier,
     and a 0-100 demand_signal for the composite scorer.

@@ -33,6 +33,6 @@ def get_flood_zone(lat: float, lng: float) -> dict:
                 result["requires_insurance"] = True
                 result["annual_insurance_est"] = FLOOD_INSURANCE_COST[zone]
                 result["flag"] = f"Zone {zone} — flood insurance required (~${FLOOD_INSURANCE_COST[zone]:,}/yr)"
-        break
+            break
 
     return result
