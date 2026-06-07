@@ -385,6 +385,7 @@ function PropertyMap({ onLoadCalculator }) {
   const cardRefs = useRef({});
   const fetchedComps = useRef(new Set());
   const fetchedTraffic = useRef(new Set());
+  const hasDeepLinked = useRef(false);
 
   const dismissProperty = (id) => {
     const next = new Set(dismissed);
@@ -547,15 +548,20 @@ function PropertyMap({ onLoadCalculator }) {
       .catch(() => fetchedTraffic.current.delete(selected));
   }, [selected, properties]);
 
-  // Deep-link: ?property=<address> auto-selects and scrolls to a property.
-  // Fires when properties updates so it works for both seed data and API-loaded data.
+  // Deep-link: ?property=<address> auto-selects, resets filters, and scrolls to a property.
+  // Fires when properties updates so it works once API data has loaded.
   useEffect(() => {
+    if (hasDeepLinked.current) return;
     const addr = new URLSearchParams(window.location.search).get("property");
     if (!addr || properties.length === 0) return;
     const match = properties.find((p) => (p.address || "").toLowerCase() === addr.toLowerCase());
     if (!match) return;
+    hasDeepLinked.current = true;
+    // Reset filter and topN so the card is guaranteed to be rendered regardless of type or rank.
+    setFilter("all");
+    setTopN(properties.length);
     setSelected(match.id);
-    setTimeout(() => cardRefs.current[match.id]?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
+    setTimeout(() => cardRefs.current[match.id]?.scrollIntoView({ behavior: "smooth", block: "start" }), 400);
   }, [properties]);
 
   // Populate score cache: use pre-computed fields when available, fall back to API for any gaps
