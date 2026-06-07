@@ -39,8 +39,9 @@ ATHENS_BASE_RENTS_PER_UNIT = {
     4: 1450,
 }
 
-# Athens market 2BR median (baseline denominator for census tract ratio)
-_ATHENS_2BR_MEDIAN = 1400
+# Clarke County ACS 2023 tract median gross rent average (34 tracts, all unit types).
+# Used as the denominator so an average-neighborhood tract produces a neutral 1.0 ratio.
+_ATHENS_2BR_MEDIAN = 1130
 
 # Path to the nightly-batch-updated rent baseline file (may not exist yet)
 _BASELINES_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "reference", "rent_baselines.json")
