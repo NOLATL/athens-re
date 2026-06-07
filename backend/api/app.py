@@ -21,7 +21,10 @@ CORS(app)
 import threading as _threading
 _batch_running_lock = _threading.Lock()
 
-DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "reference")
+DATA_DIR = os.getenv(
+    "BATCH_DATA_DIR",
+    os.path.join(os.path.dirname(__file__), "..", "data", "reference"),
+)
 
 # Cache entries: filename → (mtime, data)
 # Re-reads the file if it has been modified since last load (e.g. by the nightly batch job).

@@ -31,7 +31,12 @@ if _PROJECT_ROOT not in sys.path:
 
 logger = logging.getLogger(__name__)
 
-DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "reference")
+# BATCH_DATA_DIR env var points to Azure's persistent /home/ storage so runtime
+# files survive deployments. Falls back to the committed data directory locally.
+DATA_DIR = os.getenv(
+    "BATCH_DATA_DIR",
+    os.path.join(os.path.dirname(__file__), "..", "data", "reference"),
+)
 STATE_FILE = os.path.join(DATA_DIR, "last_run_state.json")
 PROPERTIES_FILE = os.path.join(DATA_DIR, "properties.json")
 DISTRESSED_FILE = os.path.join(DATA_DIR, "distressed_parcels.json")
