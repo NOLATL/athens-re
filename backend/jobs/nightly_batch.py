@@ -553,7 +553,11 @@ def run(dry_run: bool = False) -> dict:
     try:
         from backend.scrapers.distressed import run_distress_pipeline
         logger.info("Running distress pipeline...")
-        parcels = run_distress_pipeline("clarke")
+        # Pass the summary's own error list so per-source fetch failures (403/500)
+        # are counted. Previously the pipeline swallowed those internally and
+        # returned [], so a fully-dead distress half still reported errors=0 and
+        # emailed a "success" digest.
+        parcels = run_distress_pipeline("clarke", errors=summary["errors"])
         logger.info("Distress pipeline: %d parcels", len(parcels))
     except Exception as e:
         msg = f"Distress pipeline failed: {e}"
