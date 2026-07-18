@@ -36,6 +36,13 @@ from backend.analysis.distress_scorer import enrich_parcel
 
 logger = logging.getLogger(__name__)
 
+
+class ScraperError(Exception):
+    """A source failed to FETCH (network/403/500), as distinct from fetching
+    successfully and finding no distressed parcels. The pipeline collects these
+    so the nightly batch can report a real error count instead of `errors=0`
+    while both distress sources are silently dead."""
+
 _SESSION = requests.Session()
 _SESSION.headers.update({
     "User-Agent": (
@@ -165,8 +172,7 @@ def fetch_tax_delinquents(county: str = "clarke") -> list[dict]:
     }
     r = _post(_QPUBLIC_SEARCH_URL, data)
     if not r:
-        logger.error("Failed to fetch delinquent parcel list from qPublic")
-        return []
+        raise ScraperError("failed to fetch delinquent parcel list from qPublic")
 
     soup = BeautifulSoup(r.text, "html.parser")
     parcel_ids = []
@@ -269,8 +275,7 @@ def fetch_fi_fa_liens(county: str = "clarke") -> list[dict]:
     }
     r = _get(_GSCCCA_LIEN_URL, params=params)
     if not r:
-        logger.error("Failed to fetch GSCCCA lien search results")
-        return []
+        raise ScraperError("failed to fetch GSCCCA lien search results")
 
     soup = BeautifulSoup(r.text, "html.parser")
     results = []
@@ -440,17 +445,33 @@ def is_absentee_owner(parcel_id: str) -> bool:
 
 # ── full pipeline ─────────────────────────────────────────────────────────────
 
-def run_distress_pipeline(county: str = "clarke") -> list[dict]:
+def run_distress_pipeline(county: str = "clarke", errors: list | None = None) -> list[dict]:
     """
     Run all scrapers, merge results by parcel_id, and return a deduplicated
     list of parcels enriched with distress scores.
 
     Signals from different sources are OR'd together — if any source flags
     a parcel, that signal is set to True.
+
+    Per-source failure isolation: a source that raises ScraperError is logged
+    and its message appended to `errors` (if provided), and the pipeline
+    continues with the other sources — one dead source never kills the run. But
+    the failure is now VISIBLE to the caller, so the nightly batch stops
+    reporting `errors=0` while the distress half is entirely dead.
     """
     logger.info("Starting distress pipeline for %s county...", county)
 
     all_parcels: dict[str, dict] = {}  # keyed by parcel_id
+
+    def _safe(source_name: str, fn):
+        try:
+            return fn()
+        except ScraperError as exc:
+            msg = f"distress source '{source_name}': {exc}"
+            logger.error(msg)
+            if errors is not None:
+                errors.append(msg)
+            return []
 
     def _merge(parcels: list[dict]):
         for p in parcels:
@@ -469,10 +490,10 @@ def run_distress_pipeline(county: str = "clarke") -> list[dict]:
             else:
                 all_parcels[pid] = p
 
-    _merge(fetch_tax_sale_list())
-    _merge(fetch_tax_delinquents(county))
-    _merge(fetch_fi_fa_liens(county))
-    _merge(fetch_code_violations(county))
+    _merge(_safe("tax_sale_list", fetch_tax_sale_list))
+    _merge(_safe("tax_delinquents", lambda: fetch_tax_delinquents(county)))
+    _merge(_safe("fi_fa_liens", lambda: fetch_fi_fa_liens(county)))
+    _merge(_safe("code_violations", lambda: fetch_code_violations(county)))
 
     # Geocode any parcels that lack lat/lng so they appear on the map
     logger.info("Geocoding parcels without coordinates...")
